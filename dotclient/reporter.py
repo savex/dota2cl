@@ -3,16 +3,16 @@
 import ruamel.yaml
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotclient.dota2cl import dota2cl
+from dotclient.exceptions import ApiRequestError
 from dotclient.log import logger_cli
 
 
 class dotaReporter(ABC):
     """Base class for reporting data from the API client."""
     payload: dict = {}
-    time_fmt: str = "%Y-%m-%dT%H:%M:%S.%fZ"
 
     def __init__(self, args) -> None:
         # TODO: Add jinja2 support to render report as HTML or Markdown
@@ -20,7 +20,7 @@ class dotaReporter(ABC):
         self.yaml = ruamel.yaml.YAML()
         self.yaml.preserve_quotes = True
         self.yaml.explicit_start = True
-        self.trottle = args.trottle
+        self.throttle = args.throttle
 
     # To provide convenience for users of the class, make it callable
     def __call__(self) -> None:
@@ -34,6 +34,19 @@ class dotaReporter(ABC):
         """Generates the payload for the report.
         To be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement this method")
+
+    @staticmethod
+    def parse_time(value: str) -> datetime:
+        """
+        Parse API ISO 8601 timestamp, e.g. '2025-02-21T10:00:14.982Z'.
+        Fractional seconds are optional. Timestamps without
+        a timezone are treated as UTC.
+        Raises ValueError or TypeError for invalid values.
+        """
+        parsed = datetime.fromisoformat(value)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
 
     def save_payload(self, payload: dict) -> None:
         # TODO: Add option to save as JSON or YAML
@@ -62,14 +75,23 @@ class topTeamsReport(dotaReporter):
         # it looks messy, but it is more efficient to do it in one pass
         # instead of multiple passes over the data
         teams = {}
+        # API timestamps are in UTC, so compare against UTC time.
+        # Taken once, so all players are measured from the same moment.
+        _now = datetime.now(timezone.utc)
         for player in players:
             if player.get("full_history_time") is None:
                 continue
 
-            _history_start = datetime.strptime(
-                player.get("full_history_time"),
-                self.time_fmt)
-            _experience = (datetime.now() - _history_start).total_seconds()
+            try:
+                _history_start = self.parse_time(
+                    player.get("full_history_time"))
+            except (ValueError, TypeError):
+                logger_cli.warning(
+                    f"Player '{player.get('personaname')}' has invalid "
+                    f"full_history_time "
+                    f"'{player.get('full_history_time')}', skipping")
+                continue
+            _experience = (_now - _history_start).total_seconds()
             player["experience"] = _experience
 
             team_id = player.get("team_id")
@@ -161,7 +183,15 @@ class topTeamsReport(dotaReporter):
         top_teams_data = []
         for team_id in top_teams:
             if team_id not in teams_data:
-                teams_data[team_id] = self.api_client.get_team_by_id(team_id)
+                try:
+                    teams_data[team_id] = \
+                        self.api_client.get_team_by_id(team_id)
+                except ApiRequestError as e:
+                    # Keep the team in the report with empty details
+                    # instead of failing the whole report
+                    logger_cli.warning(
+                        f"Failed to get details for team {team_id}: {e}")
+                    teams_data[team_id] = {}
             _team = {
                 "Team Name": teams_data[team_id].get("name"),
                 "Team ID": team_id,

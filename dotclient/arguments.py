@@ -1,7 +1,22 @@
 #    Author: Alex Savatieiev (a.savex@gmail.com)
 #    November 2025
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser, ArgumentTypeError, FileType
 from sys import stdout
+
+log_levels = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
+
+
+def positive_int(value: str) -> int:
+    """
+    Argparse type for integers greater than zero.
+    """
+    try:
+        number = int(value)
+    except ValueError:
+        raise ArgumentTypeError(f"invalid int value: '{value}'")
+    if number < 1:
+        raise ArgumentTypeError(f"must be at least 1, got {number}")
+    return number
 
 
 def parse_args():
@@ -18,24 +33,25 @@ def parse_args():
     parser.add_argument(
         "-n",
         "--num-teams",
-        type=int,
+        type=positive_int,
         default=5,
-        help="number of teams in output",
+        help="number of teams in output (default: %(default)s)",
     )
     parser.add_argument(
         "-l",
         "--loglevel",
-        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        choices=log_levels,
         default="WARNING",
-        help="Only output log messages of this severity or above. "
-             "Writes to stderr. (default: %(default)s)",
+        help="Only write internal log messages of this severity or above "
+             "to the log file. Console messages are always copied to the "
+             "log file as well. (default: %(default)s)",
     )
     # to have a flexible way of showing or not showing debug logs in CLI
     parser.add_argument(
         "--cliloglevel",
-        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        choices=log_levels,
         default="WARNING",
-        help="Only output log messages of this severity or above. "
+        help="Only print console messages of this severity or above. "
              "Writes to stderr. (default: %(default)s)",
     )
     # Causes reported to preload whole teams data from API,
@@ -47,12 +63,12 @@ def parse_args():
         action="store_true",
         help="Preload teams data from API",
     )
-    # To avoid hitting API rate limits, enable request trottle
+    # To avoid hitting API rate limits, enable request throttle
     # So far it is hardcoded to 1 second between requests, but
     # it can be made configurable in the future.
     parser.add_argument(
-        "--trottle",
+        "--throttle",
         action="store_true",
-        help="Enable request trottling to avoid hitting API rate limits",
+        help="Enable request throttling to avoid hitting API rate limits",
     )
     return parser.parse_args()

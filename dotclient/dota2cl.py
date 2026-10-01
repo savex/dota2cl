@@ -7,51 +7,67 @@ import urllib.parse as urlparse
 from datetime import datetime
 from requests.exceptions import RequestException
 
-from dotclient.const import api_client_trottle_timeout_sec, \
+from dotclient.const import api_client_throttle_timeout_sec, \
     resource_cache_timeout_sec, opendota_api_base_url, \
-    requests_timeout_sec
+    requests_timeout_sec, api_client_max_retries, \
+    api_client_retry_backoff_sec
+from dotclient.exceptions import ApiRequestError, InvalidEndpointError, \
+    InvalidResponseError, NotFoundError, RateLimitError, SchemaLoadError
 from dotclient.log import logger_cli, logger
+from dotclient.utils import secrets_filter
 
 
 class apiClient:
     """
     Simple API client that loads schema from root endpoint and validates
-    endpoints before making requests. It also handles trottle of requests.
+    endpoints before making requests. It also handles throttle of requests.
     """
     def __init__(self, base_url: str, api_key: str | None = None,
-                 trottle: bool = False):
+                 throttle: bool = False):
         self.api_key = api_key
+        # add key to filter to avoid logging it in clear text
+        if api_key is not None:
+            secrets_filter.add_secret(api_key)
         self.is_anonymous = api_key is None
         self.base_url = base_url
         logger_cli.debug("...initializing API client "
                          f"with base URL: {self.base_url}")
-        self.schema = self.load_schema()
-        if not self.schema:
-            logger_cli.warning("Failed to load API schema. "
+        try:
+            self.schema = self.load_schema()
+        except SchemaLoadError as e:
+            logger_cli.warning(f"{e}. "
                                "Validation of endpoints will be skipped.")
-            self.rest_handle_validation = False
-        else:
-            self.rest_handle_validation = True
+            self.schema = {}
+        self.rest_handle_validation = bool(self.schema)
 
-        # TODO: load options from config file, e.g. trottle_requests, trottle_timeout_sec  # noqa: E501
-        self.trottle_requests = trottle
-        self.trottle_timeout_sec = api_client_trottle_timeout_sec
+        # TODO: load options from config file, e.g. throttle_requests, throttle_timeout_sec  # noqa: E501
+        self.throttle_requests = throttle
+        self.throttle_timeout_sec = api_client_throttle_timeout_sec
         self.last_request_time = datetime.now()
         self.cache_request_timeout_sec = resource_cache_timeout_sec
+        self.max_retries = api_client_max_retries
+        self.retry_backoff_sec = api_client_retry_backoff_sec
+        # Cached responses keyed by handle
+        self._cache: dict[str, dict] = {}
 
-    def load_schema(self) -> dict | None:
-        # load schema with basic error handling
+    def load_schema(self) -> dict:
+        """
+        Load API schema from the root endpoint.
+        Raises SchemaLoadError if it can't be fetched or parsed.
+        """
         try:
             resp = requests.get(self.base_url, timeout=requests_timeout_sec)
             resp.raise_for_status()
-            return resp.json()
+            schema = resp.json()
         except ValueError as e:
-            logger_cli.error(f"Invalid JSON received for API schema: {e}")
-            return {}
+            raise SchemaLoadError(
+                f"Invalid JSON received for API schema: {e}") from e
         except RequestException as e:
-            logger_cli.error("Failed to load API schema "
-                             f"from {self.base_url}: {e}")
-            return {}
+            raise SchemaLoadError("Failed to load API schema "
+                                  f"from {self.base_url}: {e}") from e
+        if not isinstance(schema, dict):
+            raise SchemaLoadError("API schema is not a JSON object")
+        return schema
 
     def _check_request_time(self, timestamp: float) -> bool:
         """
@@ -65,13 +81,6 @@ class apiClient:
         """
         Get cached item by handle.
         """
-        def _update_cache(handle, data):
-            setattr(self, handle, {
-                "handle": handle,
-                "timestamp": datetime.now().timestamp(),
-                "data": data
-            })
-
         def get_data():
             if page_size > 0:
                 logger_cli.debug(f"...getting paginated data for {handle}, "
@@ -86,6 +95,10 @@ class apiClient:
                     # next page is empty to avoid infinite loop
                     if not next_page:
                         break
+                    if not isinstance(next_page, list):
+                        raise InvalidResponseError(
+                            f"Expected a list for page {page} of '{handle}', "
+                            f"got {type(next_page).__name__}")
                     logger_cli.debug(f"Got {len(next_page)} items "
                                      f"for page {page}")
                     data += next_page
@@ -98,19 +111,21 @@ class apiClient:
             else:
                 return self.get(handle, id_name=id_name)
 
-        try:
-            item = getattr(self, handle)
-        except AttributeError:
+        item = self._cache.get(handle)
+        if item is None:
             logger.debug(f"No cache found for {handle}. Fetching new data.")
-            _update_cache(handle, get_data())
-            item = getattr(self, handle)
-
-        if not self._check_request_time(item["timestamp"]):
-            logger.debug(f"Using cached data for {handle}")
-        else:
+        elif self._check_request_time(item["timestamp"]):
             logger.debug(f"Cache expired for {handle}. Fetching new data.")
-            _update_cache(handle, get_data())
+        else:
+            logger.debug(f"Using cached data for {handle}")
+            return item["data"]
 
+        item = {
+            "handle": handle,
+            "timestamp": datetime.now().timestamp(),
+            "data": get_data()
+        }
+        self._cache[handle] = item
         return item["data"]
 
     def validate_endpoint(self, endpoint: str,
@@ -141,10 +156,13 @@ class apiClient:
             id_name: str | None = None) -> dict:
         """
         Make a GET request to the OPENDOTA API.
+        Raises InvalidEndpointError if the endpoint is not in the schema,
+        ApiRequestError (or its subclasses) if the request fails and
+        InvalidResponseError if the response body is not valid JSON.
         """
         if self.rest_handle_validation and \
                 not self.validate_endpoint(endpoint, id_name=id_name):
-            return {"error": f"Endpoint '{endpoint}' is not valid."}
+            raise InvalidEndpointError(f"Endpoint '{endpoint}' is not valid.")
 
         # Prepare params dict with API key if not anonymous
         if params is None:
@@ -153,31 +171,91 @@ class apiClient:
             params["key"] = self.api_key
 
         url = urlparse.urljoin(self.base_url + "/", endpoint)
+        response = self._request_with_retries(url, params, endpoint)
 
-        # Handle trottle of requests
-        if self.trottle_requests:
-            time_since_last_request = \
-                (datetime.now() - self.last_request_time).total_seconds()
-            if time_since_last_request < self.trottle_timeout_sec:
-                wait_time = self.trottle_timeout_sec - time_since_last_request
-                logger_cli.debug("...trottle request. "
-                                 f"Waiting for {wait_time:.2f} seconds.")
+        if len(response.content) == 0:
+            return {}
+        try:
+            return response.json()
+        except ValueError:
+            raise InvalidResponseError(
+                f"Invalid JSON received from '{endpoint}'") from None
+
+    def _throttle(self) -> None:
+        """
+        Wait until throttle timeout has passed since the last request.
+        """
+        if not self.throttle_requests:
+            return
+        time_since_last_request = \
+            (datetime.now() - self.last_request_time).total_seconds()
+        if time_since_last_request < self.throttle_timeout_sec:
+            wait_time = self.throttle_timeout_sec - time_since_last_request
+            logger_cli.debug("...throttle request. "
+                             f"Waiting for {wait_time:.2f} seconds.")
+            time.sleep(wait_time)
+
+    @staticmethod
+    def _get_retry_after(response) -> float | None:
+        """
+        Get 'Retry-After' header value in seconds, if it is a number.
+        """
+        _value = getattr(response, "headers", {}).get("Retry-After")
+        try:
+            return float(_value) if _value is not None else None
+        except ValueError:
+            # HTTP date format is not supported, use backoff instead
+            return None
+
+    def _request_with_retries(self, url: str, params: dict,
+                              endpoint: str):
+        """
+        Send GET request, retrying on 429 Too Many Requests.
+        Errors are re-raised without the original exception attached,
+        as its message contains the full URL with the API key.
+        """
+        for attempt in range(self.max_retries + 1):
+            self._throttle()
+            logger.debug(f"Requesting {endpoint} with params: {params}")
+            try:
+                response = requests.get(url, params=params,
+                                        timeout=requests_timeout_sec)
+            except RequestException as e:
+                raise ApiRequestError(
+                    f"Request to '{endpoint}' failed: {type(e).__name__}",
+                    endpoint=endpoint) from None
+            finally:
+                self.last_request_time = datetime.now()
+
+            status = response.status_code
+            if status == 429:
+                retry_after = self._get_retry_after(response)
+                if attempt >= self.max_retries:
+                    raise RateLimitError(
+                        f"Rate limit exceeded for '{endpoint}' "
+                        f"after {self.max_retries} retries",
+                        endpoint=endpoint, retry_after=retry_after)
+                wait_time = retry_after if retry_after is not None \
+                    else self.retry_backoff_sec * 2 ** attempt
+                logger_cli.warning(f"Rate limited on '{endpoint}', "
+                                   f"retrying in {wait_time:.0f} seconds "
+                                   f"({attempt + 1}/{self.max_retries})")
                 time.sleep(wait_time)
-
-        logger.debug(f"Requesting {endpoint} with params: {params}")
-        response = requests.get(url, params=params,
-                                timeout=requests_timeout_sec)
-        self.last_request_time = datetime.now()
-
-        response.raise_for_status()
-
-        return response.json() if len(response.content) > 0 else {}
+                continue
+            if status == 404:
+                raise NotFoundError(f"Resource '{endpoint}' not found",
+                                    endpoint=endpoint)
+            if status >= 400:
+                raise ApiRequestError(
+                    f"Request to '{endpoint}' failed with HTTP {status}",
+                    endpoint=endpoint, status_code=status)
+            return response
 
 
 class dota2cl(apiClient):
-    def __init__(self, api_key: str | None = None, trottle: bool = False):
+    def __init__(self, api_key: str | None = None, throttle: bool = False):
         super().__init__(opendota_api_base_url, api_key,
-                         trottle=trottle)
+                         throttle=throttle)
         self.cache_request_timeout_sec = 60  # 1 min
 
     def get_pro_players(self) -> dict:

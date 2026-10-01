@@ -1,21 +1,22 @@
 import os
+import sys
 
 from dotclient.arguments import parse_args
 from dotclient.const import title, opendota_api_key_env_var
 from dotclient.dota2cl import dota2cl
+from dotclient.exceptions import DotClientError
 from dotclient.log import logger_cli, logger, set_log_level
 from dotclient.reporter import topTeamsReport
 
 
-def load_api_key(env_var: str | None) -> str | None:
-    api_key = None
-    if env_var is None:
-        logger_cli.info(
-            f"Using environment variable '{opendota_api_key_env_var}'")
-        api_key = os.getenv(opendota_api_key_env_var)
-        if api_key is None:
-            logger_cli.warning(f"API key not found in environment variable "
-                               f"'{opendota_api_key_env_var}'")
+def load_api_key(env_var: str = opendota_api_key_env_var) -> str | None:
+    api_key = (os.getenv(env_var) or "").strip()
+    if not api_key:
+        logger_cli.warning(f"API key not found in environment variable "
+                           f"'{env_var}', using anonymous access "
+                           "(lower rate limits)")
+        return None
+    logger_cli.info(f"Using API key from environment variable '{env_var}'")
     return api_key
 
 
@@ -30,13 +31,17 @@ def run() -> None:
                     f"# Using CLI log level '{args.cliloglevel}'")
 
     # Generate report
-    topTeamsReport(
-        args,
-        api_client=dota2cl(
-            trottle=args.trottle,
-            api_key=load_api_key(opendota_api_key_env_var)
-        )
-    )()
+    try:
+        topTeamsReport(
+            args,
+            api_client=dota2cl(
+                throttle=args.throttle,
+                api_key=load_api_key()
+            )
+        )()
+    except DotClientError as e:
+        logger_cli.error(f"Failed to generate report: {e}")
+        sys.exit(1)
 
     logger_cli.debug("...done")
     return

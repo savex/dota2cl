@@ -22,7 +22,7 @@ dependencies = [
 
 entry_points = {
     "console_scripts": [
-        "dotclient = main.entrypoint"
+        "dotclient = dotclient.runner:run"
     ]
 }
 

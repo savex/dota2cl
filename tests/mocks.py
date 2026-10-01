@@ -5,6 +5,8 @@ import json
 import os
 import urllib.parse as urlparse
 
+from requests.exceptions import HTTPError
+
 from dotclient.const import opendota_api_base_url
 
 from tests.test_base import tests_dir
@@ -37,7 +39,8 @@ _handle_map = {
 
 
 class MockResponse:
-    def __init__(self, _buffer: str | bytes | dict | None, status_code):
+    def __init__(self, _buffer: str | bytes | dict | None, status_code,
+                 headers: dict | None = None):
         if _buffer is None:
             self._content = _buffer
             self._text = _buffer
@@ -57,6 +60,7 @@ class MockResponse:
             self._json = None
 
         self.status_code = status_code
+        self.headers = headers or {}
         self._reason = "OK" if self.status_code == 200 else "FAIL"
 
     @property
@@ -80,7 +84,8 @@ class MockResponse:
                 else:
                     raise Exception("Unsupported type for json parsing")
             except Exception:
-                raise Exception("Failed to create json {}".format(self.text))
+                # requests raises JSONDecodeError, a ValueError subclass
+                raise ValueError("Failed to create json {}".format(self.text))
             return _j
         else:
             return self._json
@@ -97,7 +102,7 @@ class MockResponse:
 
     def raise_for_status(self):
         if not self.ok():
-            raise Exception(f"HTTP Error: {self.status_code} {self.reason}")
+            raise HTTPError(f"HTTP Error: {self.status_code} {self.reason}")
 
 
 def mocked_requests_get(*args, **kwargs):

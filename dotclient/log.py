@@ -9,6 +9,7 @@ import logging
 import os
 
 from dotclient.const import title
+from dotclient.utils import secrets_filter
 
 pkg_dir = os.path.dirname(__file__)
 pkg_dir = os.path.join(pkg_dir, os.pardir)
@@ -71,6 +72,7 @@ def setup_loggers(name, def_level=logging.DEBUG, log_fname=None):
     log_format = '%(message)s'
     colored_formatter = ColoredFormatter(log_format, datefmt="%H:%M:%S")
     sh.setFormatter(colored_formatter)
+    sh.addFilter(secrets_filter)
 
     # File handler
     if log_fname is not None:
@@ -79,6 +81,7 @@ def setup_loggers(name, def_level=logging.DEBUG, log_fname=None):
         formatter = logging.Formatter(log_format, datefmt="%H:%M:%S")
         fh.setFormatter(formatter)
         fh.setLevel(logging.DEBUG)
+        fh.addFilter(secrets_filter)
     else:
         fh = None
 
