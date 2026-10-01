@@ -1,3 +1,5 @@
+import contextlib
+import io
 import sys
 from unittest import mock
 
@@ -28,3 +30,12 @@ class TestArguments(DotClientTestBase):
             with self.redirect_output():
                 with self.assertRaises(SystemExit):
                     self._parse(["-n", _bad])
+
+    def test_version_flag(self):
+        from dotclient import __version__
+        _out = io.StringIO()
+        with contextlib.redirect_stdout(_out):
+            with self.assertRaises(SystemExit) as _exit:
+                self._parse(["--version"])
+        self.assertEqual(_exit.exception.code, 0)
+        self.assertEqual(_out.getvalue().strip(), f"dotclient {__version__}")

@@ -43,6 +43,9 @@ class dotaReporter(ABC):
         a timezone are treated as UTC.
         Raises ValueError or TypeError for invalid values.
         """
+        # Python < 3.11 fromisoformat() does not accept the 'Z' suffix
+        if isinstance(value, str) and value.endswith("Z"):
+            value = value[:-1] + "+00:00"
         parsed = datetime.fromisoformat(value)
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)

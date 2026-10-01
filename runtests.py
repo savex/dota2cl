@@ -1,5 +1,6 @@
 #    Author: Alex Savatieiev (a.savex@gmail.com)
 #    April-May 2023
+import sys
 import unittest
 
 from unittest import TextTestResult, TextTestRunner
@@ -32,7 +33,10 @@ if __name__ == '__main__':
     # start tests
     suite = unittest.TestLoader().discover(tests_dir, "test_*", tests_dir)
     runner = MyTestRunner(verbosity=3)
-    runner.run(suite)
+    result = runner.run(suite)
 
     # cleanup after testrun
     _cleanup()
+
+    # non-zero exit code so CI can detect failures
+    sys.exit(not result.wasSuccessful())

@@ -1,6 +1,7 @@
 import os
 import sys
 
+from dotclient import __version__
 from dotclient.arguments import parse_args
 from dotclient.const import title, opendota_api_key_env_var
 from dotclient.dota2cl import dota2cl
@@ -22,11 +23,13 @@ def load_api_key(env_var: str = opendota_api_key_env_var) -> str | None:
 
 def run() -> None:
     args = parse_args()
+    # Logged before levels are applied, so every log file records the version
+    logger.info(f"{title} version {__version__}")
     # Setting log levels befor any output happens,
     # so the log level is respected for all log messages
     set_log_level(logger, args.loglevel)
     set_log_level(logger_cli, args.cliloglevel)
-    logger_cli.info(f"# Running {title}\n"
+    logger_cli.info(f"# Running {title} {__version__}\n"
                     f"# Using log level '{args.loglevel}'\n"
                     f"# Using CLI log level '{args.cliloglevel}'")
 

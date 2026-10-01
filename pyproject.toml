@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dota2client"
+dynamic = ["version"]
+description = "Simple client for opendota API"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Alex Savatieiev", email = "a.savex@gmail.com" }]
+keywords = ["dota2", "opendota", "dota2 api", "dota2 client"]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "ruamel.yaml==0.18.16",
+    "requests<=2.32.4",
+]
+
+[project.optional-dependencies]
+test = ["coverage"]
+
+[project.scripts]
+dotclient = "dotclient.runner:run"
+
+[tool.setuptools]
+zip-safe = false
+
+[tool.setuptools.packages.find]
+include = ["dotclient*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.conf", "*.env", "*.list", "*.html"]
+
+# Version is taken from the latest git tag (vX.Y.Z).
+# Untagged commits get a dev version, e.g. 0.1.1.dev3+g4ddaef9
+[tool.setuptools_scm]
+version_file = "dotclient/_version.py"

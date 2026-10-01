@@ -3,6 +3,8 @@
 from argparse import ArgumentParser, ArgumentTypeError, FileType
 from sys import stdout
 
+from dotclient import __version__
+
 log_levels = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
 
 
@@ -26,6 +28,11 @@ def parse_args():
     parser = ArgumentParser(
         description="Find the DOTA 2 teams with the most combined player *experience",  # noqa: E501
         epilog="*Experience is defined as the length of a player's recorded history.",  # noqa: E501
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
         "output", type=FileType("w"), nargs="?", default=stdout
