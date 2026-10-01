@@ -1,0 +1,105 @@
+{
+    "openapi": "0.0.0",
+    "info": {
+        "title": "Fake OpenDota API",
+        "description": "Fake Schema for testing purposes",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "https://localhost/api"
+        }
+    ],
+    "components": {},
+    "paths": {
+        "/proPlayers": {
+            "get": {
+                "operationId": "get_pro_players",
+                "summary": "GET /proPlayers",
+                "description": "Get list of pro players",
+                "tags": [
+                    "pro players"
+                ],
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json; charset=utf-8": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PlayerObjectResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/teams": {
+            "get": {
+                "operationId": "get_teams",
+                "summary": "GET /teams",
+                "description": "Get team data",
+                "tags": [
+                    "teams"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number, zero indexed. Each page returns up to 1000 entries.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json; charset=utf-8": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/TeamObjectResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },        
+        "/teams/{team_id}": {
+            "get": {
+                "operationId": "get_teams_by_team_id",
+                "summary": "GET /teams/{team_id}",
+                "description": "Get data for a team",
+                "tags": [
+                    "teams"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/teamIdPathParam"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json; charset=utf-8": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TeamObjectResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

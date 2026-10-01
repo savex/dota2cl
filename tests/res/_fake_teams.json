@@ -1,0 +1,22 @@
+[
+    {
+        "team_id": 1,
+        "rating": 13.13,
+        "wins": 123,
+        "losses": 456,
+        "last_match_time": 1762690759,
+        "name": "Test Team",
+        "tag": "tst",
+        "logo_url": "https://localhost/fakeimage.jpg"
+    },
+    {
+        "team_id": 2,
+        "rating": 77.77,
+        "wins": 1,
+        "losses": 2,
+        "last_match_time": 1762690759,
+        "name": "Test Team 2",
+        "tag": "anothertst",
+        "logo_url": "https://localhost/fakeimage.jpg"
+    }
+]
