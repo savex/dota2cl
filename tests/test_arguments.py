@@ -39,3 +39,25 @@ class TestArguments(DotClientTestBase):
                 self._parse(["--version"])
         self.assertEqual(_exit.exception.code, 0)
         self.assertEqual(_out.getvalue().strip(), f"dotclient {__version__}")
+
+    def test_defaults_from_settings(self):
+        from copy import deepcopy
+        from dotclient.arguments import parse_args
+        from dotclient.config import DEFAULTS
+        _settings = deepcopy(DEFAULTS)
+        _settings["report"]["num_teams"] = 8
+        _settings["api"]["throttle"] = True
+        _args = parse_args(_settings, argv=[])
+        self.assertEqual(_args.num_teams, 8)
+        self.assertTrue(_args.throttle)
+        # Command line overrides settings
+        _args = parse_args(_settings, argv=["-n", "2", "--no-throttle"])
+        self.assertEqual(_args.num_teams, 2)
+        self.assertFalse(_args.throttle)
+
+    def test_config_path(self):
+        from dotclient.arguments import parse_config_path
+        self.assertIsNone(parse_config_path(["-n", "3"]))
+        self.assertEqual(
+            parse_config_path(["-n", "3", "--config", "/tmp/x.conf"]),
+            "/tmp/x.conf")

@@ -7,14 +7,10 @@
 
 import logging
 import os
+import sys
 
-from dotclient.const import title
+from dotclient.const import app_name, log_file_name, title
 from dotclient.utils import secrets_filter
-
-pkg_dir = os.path.dirname(__file__)
-pkg_dir = os.path.join(pkg_dir, os.pardir)
-pkg_dir = os.path.normpath(pkg_dir)
-pkg_dir = os.path.abspath(pkg_dir)
 
 
 def color_me(color):
@@ -64,7 +60,7 @@ class ColoredFormatter(logging.Formatter):
         return res
 
 
-def setup_loggers(name, def_level=logging.DEBUG, log_fname=None):
+def setup_loggers(name, def_level=logging.DEBUG):
 
     # Stream Handler
     sh = logging.StreamHandler()
@@ -74,21 +70,13 @@ def setup_loggers(name, def_level=logging.DEBUG, log_fname=None):
     sh.setFormatter(colored_formatter)
     sh.addFilter(secrets_filter)
 
-    # File handler
-    if log_fname is not None:
-        fh = logging.FileHandler(log_fname)
-        log_format = '%(asctime)s - %(levelname)8s - %(name)-15s - %(message)s'
-        formatter = logging.Formatter(log_format, datefmt="%H:%M:%S")
-        fh.setFormatter(formatter)
-        fh.setLevel(logging.DEBUG)
-        fh.addFilter(secrets_filter)
-    else:
-        fh = None
-
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
-    if len(logger.handlers) == 0 and fh is not None:
-        logger.addHandler(fh)
+    # File handler is added later by setup_log_file().
+    # Until then, keep messages from going to stderr via
+    # logging's last resort handler.
+    if len(logger.handlers) == 0:
+        logger.addHandler(logging.NullHandler())
     logger.propagate = False
 
     logger_cli = logging.getLogger(name + ".cli")
@@ -99,16 +87,64 @@ def setup_loggers(name, def_level=logging.DEBUG, log_fname=None):
     return logger, logger_cli
 
 
+def user_cache_dir() -> str:
+    """
+    Per-user cache folder for the application.
+    """
+    if sys.platform == "win32":
+        _base = os.getenv("LOCALAPPDATA") or \
+            os.path.expanduser(os.path.join("~", "AppData", "Local"))
+    elif sys.platform == "darwin":
+        _base = os.path.expanduser(os.path.join("~", "Library", "Caches"))
+    else:
+        _base = os.getenv("XDG_CACHE_HOME") or \
+            os.path.expanduser(os.path.join("~", ".cache"))
+    return os.path.join(_base, app_name)
+
+
+def setup_log_file(log_fname: str | None = None) -> str | None:
+    """
+    Start writing the log file.
+    Without a path, the log goes to the user cache folder, or to the
+    current folder if the cache folder can't be used.
+    Returns the log file path, or None if no log file could be opened.
+    """
+    if log_fname:
+        _candidates = [log_fname]
+    else:
+        _candidates = [os.path.join(user_cache_dir(), log_file_name),
+                       os.path.join(os.getcwd(), log_file_name)]
+
+    for _path in _candidates:
+        _path = os.path.abspath(os.path.expanduser(_path))
+        try:
+            os.makedirs(os.path.dirname(_path), exist_ok=True)
+            fh = logging.FileHandler(_path)
+        except OSError as e:
+            logger_cli.warning(f"Can't write log file '{_path}': {e}")
+            continue
+        log_format = '%(asctime)s - %(levelname)8s - %(name)-15s - %(message)s'
+        fh.setFormatter(logging.Formatter(log_format, datefmt="%H:%M:%S"))
+        fh.setLevel(logging.DEBUG)
+        fh.addFilter(secrets_filter)
+        # Replace the file handler if this is called again
+        for _handler in list(logger.handlers):
+            if isinstance(_handler, (logging.FileHandler,
+                                     logging.NullHandler)):
+                logger.removeHandler(_handler)
+                _handler.close()
+        logger.addHandler(fh)
+        return _path
+
+    logger_cli.warning("Log file is disabled")
+    return None
+
+
 def set_log_level(mylogger, log_level_name) -> None:
     mylogger.setLevel(log_level_name)
     return
 
 
 # init instances of logger to be used by all other modules
-logger, logger_cli = setup_loggers(
-    title,
-    log_fname=os.path.join(
-        pkg_dir,
-        os.getenv('LOGFILE', title+'.log')
-    )
-)
+# The log file is not created here, it is opened in run()
+logger, logger_cli = setup_loggers(title)

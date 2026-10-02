@@ -38,6 +38,23 @@ pip install -e ".[test]"
 ./cover.sh
 ```
 
+## Configuration
+
+Settings are applied in the following order, each one overriding the previous:
+
+1. Application defaults.
+2. The configuration file, `dota2cl.conf`.
+3. Environment variables named `DOTA2CL_<SECTION>_<KEY>`, for example `DOTA2CL_API_THROTTLE=true` or `DOTA2CL_REPORT_NUM_TEAMS=10`. The API key can also be set with `OPENDOTA_API_KEY`.
+4. Command line options.
+
+A default configuration file with every setting and its default value is included in the package. The file is located as follows:
+
+- `--config PATH` or the `DOTA2CL_CONFIG` environment variable, if set.
+- On Linux-like systems, `/etc/dota2cl.conf`. If the file does not exist and `/etc` is writable, it is created from the bundled copy on the first run. Otherwise, the bundled copy is used.
+- On other systems, the bundled copy in the package folder.
+
+The log file is written to the user cache directory (`~/.cache/dota2cl/` on Linux, `~/Library/Caches/dota2cl/` on macOS, `%LOCALAPPDATA%\dota2cl\` on Windows), or to the current directory if the cache directory cannot be used. Set `file` in the `[logging]` section to choose another location.
+
 ## Versioning and Releases
 
 The project follows [Semantic Versioning](https://semver.org/). The version is not stored in the source code; `setuptools-scm` derives it from the latest git tag at build time:

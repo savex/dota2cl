@@ -57,3 +57,10 @@ class InvalidResponseError(DotClientError):
     Raised when a response body is not valid JSON
     or does not have the expected shape.
     """
+
+
+class ConfigError(DotClientError):
+    """
+    Raised when the configuration file or an environment variable
+    has an invalid value, or the config file can't be read.
+    """

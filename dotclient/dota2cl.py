@@ -23,13 +23,21 @@ class apiClient:
     endpoints before making requests. It also handles throttle of requests.
     """
     def __init__(self, base_url: str, api_key: str | None = None,
-                 throttle: bool = False):
+                 throttle: bool = False,
+                 timeout_sec: float = requests_timeout_sec,
+                 throttle_timeout_sec: float =
+                 api_client_throttle_timeout_sec,
+                 max_retries: int = api_client_max_retries,
+                 retry_backoff_sec: float = api_client_retry_backoff_sec,
+                 cache_timeout_sec: float = resource_cache_timeout_sec):
         self.api_key = api_key
         # add key to filter to avoid logging it in clear text
         if api_key is not None:
             secrets_filter.add_secret(api_key)
         self.is_anonymous = api_key is None
         self.base_url = base_url
+        # Set before loading the schema, as it makes a request
+        self.timeout_sec = timeout_sec
         logger_cli.debug("...initializing API client "
                          f"with base URL: {self.base_url}")
         try:
@@ -40,13 +48,12 @@ class apiClient:
             self.schema = {}
         self.rest_handle_validation = bool(self.schema)
 
-        # TODO: load options from config file, e.g. throttle_requests, throttle_timeout_sec  # noqa: E501
         self.throttle_requests = throttle
-        self.throttle_timeout_sec = api_client_throttle_timeout_sec
+        self.throttle_timeout_sec = throttle_timeout_sec
         self.last_request_time = datetime.now()
-        self.cache_request_timeout_sec = resource_cache_timeout_sec
-        self.max_retries = api_client_max_retries
-        self.retry_backoff_sec = api_client_retry_backoff_sec
+        self.cache_request_timeout_sec = cache_timeout_sec
+        self.max_retries = max_retries
+        self.retry_backoff_sec = retry_backoff_sec
         # Cached responses keyed by handle
         self._cache: dict[str, dict] = {}
 
@@ -56,7 +63,7 @@ class apiClient:
         Raises SchemaLoadError if it can't be fetched or parsed.
         """
         try:
-            resp = requests.get(self.base_url, timeout=requests_timeout_sec)
+            resp = requests.get(self.base_url, timeout=self.timeout_sec)
             resp.raise_for_status()
             schema = resp.json()
         except ValueError as e:
@@ -71,7 +78,7 @@ class apiClient:
 
     def _check_request_time(self, timestamp: float) -> bool:
         """
-        Check if the last request was made more than 1 hour ago.
+        Check if the cached item is older than the cache timeout.
         """
         return datetime.now().timestamp() - timestamp > \
             self.cache_request_timeout_sec
@@ -219,7 +226,7 @@ class apiClient:
             logger.debug(f"Requesting {endpoint} with params: {params}")
             try:
                 response = requests.get(url, params=params,
-                                        timeout=requests_timeout_sec)
+                                        timeout=self.timeout_sec)
             except RequestException as e:
                 raise ApiRequestError(
                     f"Request to '{endpoint}' failed: {type(e).__name__}",
@@ -253,10 +260,10 @@ class apiClient:
 
 
 class dota2cl(apiClient):
-    def __init__(self, api_key: str | None = None, throttle: bool = False):
-        super().__init__(opendota_api_base_url, api_key,
-                         throttle=throttle)
-        self.cache_request_timeout_sec = 60  # 1 min
+    def __init__(self, api_key: str | None = None, throttle: bool = False,
+                 base_url: str = opendota_api_base_url, **options):
+        # options are the apiClient timeout, retry and cache settings
+        super().__init__(base_url, api_key, throttle=throttle, **options)
 
     def get_pro_players(self) -> dict:
         """

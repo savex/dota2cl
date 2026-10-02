@@ -148,6 +148,20 @@ class TestDota2ClientErrors(DotClientTestBase):
         with mock.patch('requests.get', side_effect=mocked_requests_get):
             return dota2cl(**kwargs)
 
+    def test_client_options(self):
+        _dt2cl = self._make_client(
+            timeout_sec=5, throttle_timeout_sec=0.5, max_retries=1,
+            retry_backoff_sec=0.1, cache_timeout_sec=600)
+        self.assertEqual(_dt2cl.timeout_sec, 5)
+        self.assertEqual(_dt2cl.throttle_timeout_sec, 0.5)
+        self.assertEqual(_dt2cl.max_retries, 1)
+        self.assertEqual(_dt2cl.retry_backoff_sec, 0.1)
+        self.assertEqual(_dt2cl.cache_request_timeout_sec, 600)
+        with mock.patch('requests.get',
+                        side_effect=mocked_requests_get) as _get:
+            _dt2cl.get_pro_players()
+        self.assertEqual(_get.call_args.kwargs["timeout"], 5)
+
     def test_schema_load_failure_disables_validation(self):
         from dotclient.dota2cl import dota2cl
         from requests.exceptions import ConnectionError

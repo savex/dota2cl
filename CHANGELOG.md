@@ -8,12 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Configuration file `dota2cl.conf`, bundled with the package. On Linux-like
+  systems it is placed in `/etc` on first run when `/etc` is writable.
+- Settings precedence: defaults < config file < `DOTA2CL_<SECTION>_<KEY>`
+  environment variables < command line options.
+- `--config` option and `DOTA2CL_CONFIG` environment variable.
+- `--no-throttle` and `--no-preload-teams` options, to turn off values
+  enabled in the config file.
 - Version is derived from git tags using `setuptools-scm`.
 - `--version` command line option.
 - Version is written to the log file and the CLI header on every run.
 - GitHub Actions workflows for testing and for tagged releases.
 
 ### Changed
+- The log file is opened when the application starts instead of on import,
+  and is written to the user cache directory, or the current directory
+  as a fallback, instead of next to the package.
+- API timeouts, retries, throttle wait and cache timeout are configurable.
 - Packaging moved from `setup.py` to `pyproject.toml`.
 - Minimum supported Python version is 3.10.
 - Test runner exits with a non-zero code when tests fail.
@@ -21,9 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of scanning all teams for every player.
 
 ### Removed
+- `LOGFILE` environment variable. Use `DOTA2CL_LOGGING_FILE` instead.
 - Unused `six` dependency.
 
 ### Fixed
+- The cache timeout was hard-coded in the client, ignoring the constant.
 - API timestamps ending in `Z` failed to parse on Python 3.10.
 - `cover.sh` returned success when tests failed.
 - Top teams report modified player data stored in the API client cache.
