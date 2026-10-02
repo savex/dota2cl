@@ -24,6 +24,9 @@ opendota_api_key_env_var = "OPENDOTA_API_KEY"
 log_levels = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
 default_log_level = "WARNING"
 default_num_teams = 5
+# Report output formats, the first one is the default
+report_formats = ["yaml", "html"]
+default_report_format = report_formats[0]
 
 opendota_api_base_url = "https://api.opendota.com/api"
 requests_timeout_sec = 180

@@ -11,7 +11,19 @@ The `dota2cl` package is a portable client for retrieving data from the OpenDota
 
 ## Reporting
 
-Reports are generated through overridable methods. This makes it possible to add new report types, including HTML reports.
+Reports are generated through overridable methods. A report subclass of `DotaReporter` implements `generate_payload()` for the data and, for HTML output, `html_body()` for the markup. The base class handles the output format and destination.
+
+The report is written as YAML to stdout by default. Give a file path to save it, and use `-f html` for an HTML page:
+
+```bash
+dota2cl                          # YAML to stdout
+dota2cl report.yaml              # YAML to a file
+dota2cl -f html top_teams.html   # HTML page
+```
+
+The default format can also be set with `format` in the `[report]` section of the config file.
+
+HTML reports share the stylesheet in `dota2cl/templates/report.css`. Reports can also be rendered with jinja2 templates from the same folder by creating them with `use_jinja2=True`. This is not a command line option. Install jinja2 with `pip install ".[html]"`.
 
 ## Known Data Issue
 

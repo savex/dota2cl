@@ -61,3 +61,14 @@ class TestArguments(DotClientTestBase):
         self.assertEqual(
             parse_config_path(["-n", "3", "--config", "/tmp/x.conf"]),
             "/tmp/x.conf")
+
+    def test_output_and_format(self):
+        _args = self._parse([])
+        self.assertEqual(_args.output, "-")
+        self.assertEqual(_args.format, "yaml")
+        _args = self._parse(["-f", "html", "report.html"])
+        self.assertEqual(_args.output, "report.html")
+        self.assertEqual(_args.format, "html")
+        with self.redirect_output():
+            with self.assertRaises(SystemExit):
+                self._parse(["-f", "xml"])

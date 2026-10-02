@@ -58,6 +58,9 @@ def run() -> None:
     except DotClientError as e:
         logger_cli.error(f"Failed to generate report: {e}")
         sys.exit(1)
+    except OSError as e:
+        logger_cli.error(f"Failed to write report: {e}")
+        sys.exit(1)
 
     logger_cli.debug("...done")
     return

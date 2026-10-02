@@ -224,3 +224,100 @@ class TestReporterTeamDetails(DotClientTestBase):
         with self.assertRaises(KeyError):
             with self.redirect_output():
                 TopTeamsReport(_args, api_client=_client).generate_payload()
+
+
+class TestReporterFormats(DotClientTestBase):
+    """
+    Report output formats and destinations.
+    """
+    _payload = {"top_teams": [{
+        "Team Name": "<Alpha>", "Team ID": 1, "Wins": 0,
+        "Losses": None, "Rating": 1500.5, "Team Experience": 86400 * 3,
+        "Players": [{"Personaname": "p&1", "Player Experience": 86400,
+                     "Country Code": "pe"}],
+    }]}
+
+    def _make_report(self, fmt="yaml", output=None, **kwargs):
+        from dota2cl.reporter import TopTeamsReport
+        _args = SimpleNamespace(
+            output=io.StringIO() if output is None else output,
+            format=fmt, throttle=False, num_teams=5, preload_teams=False)
+        return TopTeamsReport(_args, api_client=mock.Mock(), **kwargs)
+
+    def test_yaml_default(self):
+        from dota2cl.reporter import TopTeamsReport
+        _args = SimpleNamespace(output=io.StringIO(), throttle=False,
+                                num_teams=5, preload_teams=False)
+        _report = TopTeamsReport(_args, api_client=mock.Mock())
+        _report.save_payload(self._payload)
+        self.assertTrue(_report.output.getvalue().startswith("---"))
+
+    def test_html_escaped_and_complete(self):
+        _report = self._make_report("html")
+        _report.save_payload(self._payload)
+        _out = _report.output.getvalue()
+        self.assertTrue(_out.startswith("<!DOCTYPE html>"))
+        self.assertIn("&lt;Alpha&gt;", _out)
+        self.assertIn("p&amp;1", _out)
+        self.assertIn("<dd>0</dd>", _out)
+        self.assertIn("<dd>—</dd>", _out)
+        self.assertIn("3 days", _out)
+        self.assertIn("grid-template-columns", _out)
+
+    def test_html_no_teams(self):
+        _report = self._make_report("html")
+        _report.save_payload({"top_teams": []})
+        self.assertIn("No teams found", _report.output.getvalue())
+
+    def test_output_to_path(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as _dir:
+            _path = os.path.join(_dir, "report.html")
+            _report = self._make_report("html", output=_path)
+            with self.redirect_output():
+                _report.save_payload(self._payload)
+            with open(_path, encoding="utf-8") as f:
+                self.assertIn("&lt;Alpha&gt;", f.read())
+
+    def test_output_to_stdout(self):
+        import contextlib
+        _out = io.StringIO()
+        _report = self._make_report(output="-")
+        with contextlib.redirect_stdout(_out):
+            _report.save_payload(self._payload)
+        self.assertIn("Team Name: <Alpha>", _out.getvalue())
+
+    def test_html_not_supported(self):
+        from dota2cl.reporter import DotaReporter
+
+        class _Report(DotaReporter):
+            def generate_payload(self):
+                pass
+
+        _args = SimpleNamespace(output=io.StringIO(), format="html",
+                                throttle=False)
+        with self.assertRaises(NotImplementedError):
+            _Report(_args).save_payload({})
+
+    def test_jinja2_matches_builtin(self):
+        from dota2cl import reporter
+        if reporter.jinja2 is None:
+            self.skipTest("jinja2 is not installed")
+        _builtin = self._make_report("html")
+        _jinja = self._make_report("html", use_jinja2=True)
+        self.assertTrue(_jinja.use_jinja2)
+        for _payload in (self._payload, {"top_teams": []}):
+            _strip = "".join
+            self.assertEqual(
+                _strip(_builtin.render(_payload).split()),
+                _strip(_jinja.render(_payload).split()))
+
+    def test_jinja2_missing_falls_back(self):
+        from dota2cl import reporter
+        with mock.patch.object(reporter, "jinja2", None):
+            with self.redirect_output():
+                _report = self._make_report("html", use_jinja2=True)
+        self.assertFalse(_report.use_jinja2)
+        _report.save_payload(self._payload)
+        self.assertIn("&lt;Alpha&gt;", _report.output.getvalue())

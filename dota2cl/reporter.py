@@ -1,28 +1,57 @@
 #    Author: Alex Savatieiev (a.savex@gmail.com)
 #    November 2025
+import html
+import os
+import sys
 import ruamel.yaml
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from io import StringIO
 
+from dota2cl import __version__
 from dota2cl.client import Dota2Client
+from dota2cl.const import default_report_format
 from dota2cl.exceptions import ApiRequestError
 from dota2cl.log import logger_cli
+
+try:
+    # Optional, only needed when reports are rendered with jinja2
+    import jinja2
+except ImportError:
+    jinja2 = None
+
+# HTML templates and the stylesheet shared by all HTML reports
+templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+# Shown in HTML reports in place of missing values
+missing_value = "\u2014"
 
 
 class DotaReporter(ABC):
     """Base class for reporting data from the API client."""
+    # Report title, used in HTML output
+    title = "Dota 2 report"
+    # Jinja2 template in templates_dir, used only when use_jinja2 is set
+    html_template = "base.html"
 
-    def __init__(self, args) -> None:
-        # TODO: Add jinja2 support to render report as HTML or Markdown
+    def __init__(self, args, use_jinja2: bool = False) -> None:
         # Set per instance, as a class level dict would be shared
         # between all reports
         self.payload: dict = {}
+        # Path, '-' for stdout or a file-like object
         self.output = args.output
+        self.format = getattr(args, "format", default_report_format)
         self.yaml = ruamel.yaml.YAML()
         self.yaml.preserve_quotes = True
         self.yaml.explicit_start = True
         self.throttle = args.throttle
+        # Not exposed as a command line option on purpose.
+        # Built-in HTML rendering is used when jinja2 is not installed.
+        if use_jinja2 and jinja2 is None:
+            logger_cli.warning("jinja2 is not installed, "
+                               "using built-in HTML rendering")
+            use_jinja2 = False
+        self.use_jinja2 = use_jinja2
 
     # To provide convenience for users of the class, make it callable
     def __call__(self) -> None:
@@ -53,15 +82,121 @@ class DotaReporter(ABC):
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed
 
+    @staticmethod
+    def na(value):
+        """Return the value, or a placeholder if it is missing."""
+        return missing_value if value is None else value
+
+    @classmethod
+    def esc(cls, value) -> str:
+        """Escape a value for HTML output."""
+        return html.escape(str(cls.na(value)))
+
+    @staticmethod
+    def format_experience(seconds: float | None) -> str:
+        """Format experience in seconds as days."""
+        if seconds is None:
+            return missing_value
+        return f"{seconds / 86400:,.0f} days"
+
     def save_payload(self, payload: dict) -> None:
-        # TODO: Add option to save as JSON or YAML
-        self.yaml.dump(payload, self.output)
+        """Render the payload in the selected format and write it out."""
+        self.write(self.render(payload))
+
+    def render(self, payload: dict) -> str:
+        # New formats are added as render_<format> methods
+        return getattr(self, f"render_{self.format}")(payload)
+
+    def render_yaml(self, payload: dict) -> str:
+        _out = StringIO()
+        self.yaml.dump(payload, _out)
+        return _out.getvalue()
+
+    def render_html(self, payload: dict) -> str:
+        context = {
+            "title": self.title,
+            "generated": datetime.now(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M UTC"),
+            "version": __version__,
+            "css": self.load_css(),
+        }
+        if self.use_jinja2:
+            return self.render_jinja2(payload, context)
+        return self.html_page(self.html_body(payload), context)
+
+    def render_jinja2(self, payload: dict, context: dict) -> str:
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(templates_dir),
+            autoescape=True, trim_blocks=True, lstrip_blocks=True)
+        env.filters["na"] = self.na
+        env.filters["experience"] = self.format_experience
+        return env.get_template(self.html_template).render(
+            payload=payload, **context)
+
+    @staticmethod
+    def load_css() -> str:
+        with open(os.path.join(templates_dir, "report.css"),
+                  encoding="utf-8") as f:
+            return f.read()
+
+    def html_page(self, body: str, context: dict) -> str:
+        """Wrap the report body into a full HTML page.
+        Mirrors templates/base.html."""
+        _title = html.escape(context["title"])
+        return (
+            "<!DOCTYPE html>\n"
+            '<html lang="en">\n<head>\n'
+            '<meta charset="utf-8">\n'
+            '<meta name="viewport" '
+            'content="width=device-width, initial-scale=1">\n'
+            f"<title>{_title}</title>\n"
+            f"<style>\n{context['css']}</style>\n"
+            "</head>\n<body>\n"
+            '<header class="page-head">\n'
+            f"<h1>{_title}</h1>\n"
+            f'<p>Generated {context["generated"]}</p>\n'
+            "</header>\n"
+            f"<main>\n{body}</main>\n"
+            '<footer class="page-foot">'
+            f"dota2cl {html.escape(context['version'])} "
+            "&middot; data from OpenDota</footer>\n"
+            "</body>\n</html>\n"
+        )
+
+    @classmethod
+    def html_stats(cls, stats: dict) -> str:
+        """Labeled values shown as a row of cells."""
+        cells = "".join(f"<div><dt>{html.escape(label)}</dt>"
+                        f"<dd>{cls.esc(value)}</dd></div>"
+                        for label, value in stats.items())
+        return f'<dl class="stats">{cells}</dl>\n'
+
+    def html_body(self, payload: dict) -> str:
+        """Return the HTML for the report data, without the page around it.
+        To be implemented by subclasses that support HTML output."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support HTML output")
+
+    def write(self, text: str) -> None:
+        if hasattr(self.output, "write"):
+            self.output.write(text)
+        elif self.output in (None, "-"):
+            sys.stdout.write(text)
+        else:
+            # The file is opened only now, so a failed report
+            # does not leave an empty file behind
+            with open(self.output, "w", encoding="utf-8") as f:
+                f.write(text)
+            logger_cli.info(f"Report saved to '{self.output}'")
 
 
 class TopTeamsReport(DotaReporter):
     """Report for top teams by combined player experience."""
-    def __init__(self, args, api_client: Dota2Client) -> None:
-        super().__init__(args)
+    title = "Top Dota 2 teams by experience"
+    html_template = "top_teams.html"
+
+    def __init__(self, args, api_client: Dota2Client, **kwargs) -> None:
+        super().__init__(args, **kwargs)
         self.teams_count = args.num_teams
         self.preload_teams = args.preload_teams
         self.api_client = api_client
@@ -232,3 +367,41 @@ class TopTeamsReport(DotaReporter):
                 }]
             top_teams_data += [_team]
         self.payload = {"top_teams": top_teams_data}
+
+    def html_body(self, payload: dict) -> str:
+        """Team cards. Mirrors templates/top_teams.html."""
+        if not payload["top_teams"]:
+            return '<p class="empty">No teams found</p>\n'
+        cards = ""
+        for rank, team in enumerate(payload["top_teams"], start=1):
+            players = "".join(
+                '<div class="player">'
+                f'<span>{self.esc(p["Personaname"])}</span>'
+                f'<span class="country">{self.esc(p["Country Code"])}</span>'
+                f'<span class="num">'
+                f'{self.format_experience(p["Player Experience"])}</span>'
+                "</div>\n"
+                for p in team["Players"])
+            cards += (
+                '<article class="team">\n'
+                '<header class="team-head">'
+                f'<span class="rank">#{rank}</span>'
+                f'<h2>{self.esc(team["Team Name"])}</h2>'
+                f'<span class="team-id">ID {self.esc(team["Team ID"])}</span>'
+                "</header>\n"
+                + self.html_stats({
+                    "Wins": team["Wins"],
+                    "Losses": team["Losses"],
+                    "Rating": team["Rating"],
+                    "Experience":
+                        self.format_experience(team["Team Experience"]),
+                }) +
+                '<div class="players">\n'
+                '<div class="player head"><span>Player</span>'
+                '<span>Country</span><span class="num">Experience</span>'
+                "</div>\n"
+                f"{players}"
+                "</div>\n"
+                "</article>\n"
+            )
+        return f'<section class="teams">\n{cards}</section>\n'

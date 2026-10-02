@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `-f/--format` option and `report.format` setting to choose between
+  `yaml` (default) and `html` reports. HTML reports use a CSS grid layout
+  with a dark red Dota 2 color scheme.
+- Reports can render HTML with jinja2 templates from `dota2cl/templates`.
+  This is enabled in code only (`use_jinja2=True`); install with
+  `pip install ".[html]"`.
+
+### Changed
+- The output file is created only after the report is generated, so a failed
+  run no longer leaves an empty file. `-` writes to stdout.
+
+## [0.2.0] - 2026-10-02
+
+### Added
 - Configuration file `dota2cl.conf`, bundled with the package. On Linux-like
   systems it is placed in `/etc` on first run when `/etc` is writable.
 - Settings precedence: defaults < config file < `DOTA2CL_<SECTION>_<KEY>`
@@ -37,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Packaging moved from `setup.py` to `pyproject.toml`.
 - Minimum supported Python version is 3.10.
 - Test runner exits with a non-zero code when tests fail.
+- README rewritten, with installation, configuration and release
+  instructions.
 - Team lookup by name for players with `team_id` 0 uses an index built once,
   instead of scanning all teams for every player.
 
@@ -56,6 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Top teams report modified player data stored in the API client cache.
 - Report payload was a class attribute shared by all reports, and
   `save_payload()` ignored its argument.
+- Test helpers in `tests/test_base.py` failed to import modules, hid errors
+  and did not restore `sys.argv` and output after failures. New tests cover
+  the API client cache, paginated requests and the team details fallback.
 
 ## [0.1.1] - 2026-10-01
 
@@ -67,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parse UTC timestamps robustly for experience calculations.
 - Console entry point, CLI help, throttle naming, and team-count validation.
 
-## [0.1.0] - 2026-10-01
+## [0.1.0] - 2025-11-18
 
 ### Added
 - OpenDota API client with time-based request caching and schema validation.
@@ -75,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dotclient` command line tool with team count, log level, team preloading, and throttling options.
 - Unit tests, coverage, and profiling scripts.
 
-[Unreleased]: https://github.com/savex/dota2cl/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/savex/dota2cl/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/savex/dota2cl/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/savex/dota2cl/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/savex/dota2cl/releases/tag/v0.1.0

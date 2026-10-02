@@ -1,12 +1,12 @@
 #    Author: Alex Savatieiev (a.savex@gmail.com)
 #    November 2025
 from argparse import ArgumentParser, ArgumentTypeError, \
-    BooleanOptionalAction, FileType
-from sys import stdout
+    BooleanOptionalAction
 
 from dota2cl import __version__
 from dota2cl.config import DEFAULTS
-from dota2cl.const import config_env_var, config_file_name, log_levels
+from dota2cl.const import config_env_var, config_file_name, log_levels, \
+    report_formats
 
 
 def positive_int(value: str) -> int:
@@ -53,8 +53,20 @@ def parse_args(settings: dict | None = None,
         action="version",
         version=f"%(prog)s {__version__}",
     )
+    # Kept as a path, so the file is created only once the report is ready
     parser.add_argument(
-        "output", type=FileType("w"), nargs="?", default=stdout
+        "output",
+        nargs="?",
+        default="-",
+        metavar="OUTPUT",
+        help="Report file path, '-' for stdout (default: stdout)",
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=report_formats,
+        default=settings["report"]["format"],
+        help="Report format (default: %(default)s)",
     )
     # Handled by parse_config_path(), listed here for help output
     parser.add_argument(

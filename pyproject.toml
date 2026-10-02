@@ -22,7 +22,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["coverage"]
+# jinja2 is only used by the reporter when enabled in code
+html = ["jinja2"]
+test = ["coverage", "jinja2"]
 
 [project.scripts]
 dota2cl = "dota2cl.runner:run"
@@ -35,6 +37,7 @@ include = ["dota2cl*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.conf", "*.env", "*.list", "*.html"]
+"dota2cl" = ["templates/*.html", "templates/*.css"]
 
 # Version is taken from the latest git tag (vX.Y.Z).
 # Untagged commits get a dev version, e.g. 0.1.1.dev3+g4ddaef9

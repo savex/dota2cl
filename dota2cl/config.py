@@ -13,9 +13,9 @@ from copy import deepcopy
 from dota2cl.const import api_client_max_retries, \
     api_client_retry_backoff_sec, api_client_throttle_timeout_sec, \
     config_env_var, config_file_name, default_log_level, \
-    default_num_teams, env_var_prefix, log_levels, \
+    default_num_teams, default_report_format, env_var_prefix, log_levels, \
     opendota_api_base_url, opendota_api_key_env_var, \
-    requests_timeout_sec, resource_cache_timeout_sec
+    report_formats, requests_timeout_sec, resource_cache_timeout_sec
 from dota2cl.exceptions import ConfigError
 from dota2cl.log import logger_cli
 
@@ -41,6 +41,7 @@ DEFAULTS: dict[str, dict] = {
     "report": {
         "num_teams": default_num_teams,
         "preload_teams": False,
+        "format": default_report_format,
     },
     "logging": {
         "file": "",
@@ -139,6 +140,11 @@ def _apply_env(settings: dict, environ) -> None:
 def _validate(settings: dict) -> None:
     if settings["report"]["num_teams"] < 1:
         raise ConfigError("'report.num_teams' must be at least 1")
+    _format = settings["report"]["format"].lower()
+    if _format not in report_formats:
+        raise ConfigError(f"'report.format' must be one of "
+                          f"{', '.join(report_formats)}, got '{_format}'")
+    settings["report"]["format"] = _format
     for key in ("level", "cli_level"):
         _level = settings["logging"][key].upper()
         if _level not in log_levels:

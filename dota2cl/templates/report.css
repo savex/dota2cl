@@ -1,0 +1,131 @@
+/* Shared stylesheet for dota2cl HTML reports.
+   Dark red palette after the official Dota 2 web pages. */
+:root {
+  --bg: #0b0606;
+  --panel: #160b0a;
+  --panel-head: #2a0f0b;
+  --border: #3b1611;
+  --accent: #a72714;
+  --accent-bright: #e2452b;
+  --text: #e8dcd8;
+  --muted: #9a8580;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  /* Keeps wide content from stretching the page past the viewport */
+  grid-template-columns: minmax(0, 1fr);
+  background: radial-gradient(ellipse at top, #3a0d07 0%, var(--bg) 60%) fixed;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: "Radiance", "Trebuchet MS", "Segoe UI", sans-serif;
+  line-height: 1.4;
+}
+
+main { padding: 0 16px 32px; }
+
+.page-head {
+  padding: 32px 16px 24px;
+  text-align: center;
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: 24px;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 0 0 24px var(--accent);
+}
+.page-head p, .page-foot { color: var(--muted); font-size: 0.85rem; }
+.page-foot { padding: 16px; text-align: center; border-top: 1px solid var(--border); }
+
+.empty { text-align: center; color: var(--muted); }
+
+/* Report cards */
+.teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.team {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.team-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(90deg, var(--panel-head), var(--panel));
+}
+.team-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+.rank { color: var(--accent-bright); font-weight: bold; font-size: 1.3rem; }
+.team-id { color: var(--muted); font-size: 0.8rem; }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+}
+.stats div { padding: 10px 8px; text-align: center; }
+.stats div + div { border-left: 1px solid var(--border); }
+.stats dt {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.stats dd { margin: 4px 0 0; font-weight: bold; }
+
+/* Player rows share the column widths through subgrid */
+.players {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-content: start;
+  padding: 8px 0;
+}
+.player {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: 16px;
+  padding: 4px 16px;
+}
+.player:not(.head):hover { background: var(--panel-head); }
+.player span { overflow-wrap: anywhere; }
+.player.head {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.country { text-transform: uppercase; color: var(--muted); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 480px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats div:nth-child(3) { border-left: none; }
+}

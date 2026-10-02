@@ -83,6 +83,7 @@ class TestConfig(DotClientTestBase):
                       "[api]\nmax_retries = many\n",
                       "[api]\ntimeout_sec = -1\n",
                       "[report]\nnum_teams = 0\n",
+                      "[report]\nformat = xml\n",
                       "[logging]\nlevel = LOUD\n",
                       "not an ini file\n"):
             with self.assertRaises(ConfigError, msg=_text):
