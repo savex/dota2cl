@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block body %}
+{% if payload.top_teams %}
+<section class="teams">
+{% for team in payload.top_teams %}
+<article class="team">
+<header class="team-head"><span class="rank">#{{ loop.index }}</span><h2>{{ team["Team Name"] | na }}</h2><span class="team-id">ID {{ team["Team ID"] | na }}</span></header>
+<dl class="stats"><div><dt>Wins</dt><dd>{{ team["Wins"] | na }}</dd></div><div><dt>Losses</dt><dd>{{ team["Losses"] | na }}</dd></div><div><dt>Rating</dt><dd>{{ team["Rating"] | na }}</dd></div><div><dt>Experience</dt><dd>{{ team["Team Experience"] | experience }}</dd></div></dl>
+<div class="players">
+<div class="player head"><span>Player</span><span>Country</span><span class="num">Experience</span></div>
+{% for player in team["Players"] %}
+<div class="player"><span>{{ player["Personaname"] | na }}</span><span class="country">{{ player["Country Code"] | na }}</span><span class="num">{{ player["Player Experience"] | experience }}</span></div>
+{% endfor %}
+</div>
+</article>
+{% endfor %}
+</section>
+{% else %}
+<p class="empty">No teams found</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+{{ css | safe }}</style>
+</head>
+<body>
+<header class="page-head">
+<h1>{{ title }}</h1>
+<p>Generated {{ generated }}</p>
+</header>
+<main>
+{% block body %}{% endblock %}
+</main>
+<footer class="page-foot">dota2cl {{ version }} &middot; data from OpenDota</footer>
+</body>
+</html>
