@@ -221,3 +221,42 @@ class TestLogFile(DotClientTestBase):
                 mock.patch.dict(os.environ, {"LOCALAPPDATA": "/local"}):
             self.assertEqual(log.user_cache_dir(),
                              os.path.join("/local", "dota2cl"))
+
+
+class TestColoredOutput(DotClientTestBase):
+    """
+    Escape codes are used only when the output is a terminal.
+    """
+    class _Stream:
+        def __init__(self, tty):
+            self._tty = tty
+
+        def isatty(self):
+            return self._tty
+
+    def _format(self, use_color):
+        from dotclient.log import ColoredFormatter
+        _formatter = ColoredFormatter("%(levelname)s%(message)s",
+                                      use_color=use_color)
+        _record = logging.LogRecord("t", logging.ERROR, "", 0, "msg",
+                                    None, None)
+        return _formatter.format(_record)
+
+    def test_formatter_respects_use_color(self):
+        self.assertIn("\033[", self._format(True))
+        self.assertEqual(self._format(False), "ERROR   msg")
+
+    def test_color_only_on_terminal(self):
+        from dotclient.log import stream_supports_color
+        with mock.patch.dict(os.environ, clear=True):
+            self.assertTrue(stream_supports_color(self._Stream(True)))
+            self.assertFalse(stream_supports_color(self._Stream(False)))
+            # Streams without isatty, e.g. some wrappers
+            self.assertFalse(stream_supports_color(object()))
+
+    def test_color_disabled_by_env(self):
+        from dotclient.log import stream_supports_color
+        for _env in ({"NO_COLOR": "1"}, {"TERM": "dumb"}):
+            with mock.patch.dict(os.environ, _env, clear=True):
+                self.assertFalse(stream_supports_color(self._Stream(True)),
+                                 msg=_env)

@@ -24,6 +24,21 @@ def color_me(color):
     return closure
 
 
+def stream_supports_color(stream) -> bool:
+    """
+    Escape codes are only useful on a terminal. Setting NO_COLOR
+    (https://no-color.org) or TERM=dumb turns them off.
+    """
+    if os.getenv("NO_COLOR") or os.getenv("TERM") == "dumb":
+        return False
+    isatty = getattr(stream, "isatty", None)
+    try:
+        return bool(isatty and isatty())
+    except ValueError:
+        # Closed stream
+        return False
+
+
 class ColoredFormatter(logging.Formatter):
     BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
@@ -45,7 +60,7 @@ class ColoredFormatter(logging.Formatter):
         levelname = record.levelname
 
         prn_name = levelname + ' ' * (8 - len(levelname))
-        if levelname in self.colors:
+        if self.use_color and levelname in self.colors:
             record.levelname = self.colors[levelname](prn_name)
         else:
             record.levelname = prn_name
@@ -66,7 +81,10 @@ def setup_loggers(name, def_level=logging.DEBUG):
     sh = logging.StreamHandler()
     sh.setLevel(def_level)
     log_format = '%(message)s'
-    colored_formatter = ColoredFormatter(log_format, datefmt="%H:%M:%S")
+    colored_formatter = ColoredFormatter(
+        log_format,
+        use_color=stream_supports_color(sh.stream),
+        datefmt="%H:%M:%S")
     sh.setFormatter(colored_formatter)
     sh.addFilter(secrets_filter)
 

@@ -50,7 +50,9 @@ class apiClient:
 
         self.throttle_requests = throttle
         self.throttle_timeout_sec = throttle_timeout_sec
-        self.last_request_time = datetime.now()
+        # time.monotonic() of the last request, None until one is made,
+        # so the first request is not delayed
+        self.last_request_time: float | None = None
         self.cache_request_timeout_sec = cache_timeout_sec
         self.max_retries = max_retries
         self.retry_backoff_sec = retry_backoff_sec
@@ -192,10 +194,10 @@ class apiClient:
         """
         Wait until throttle timeout has passed since the last request.
         """
-        if not self.throttle_requests:
+        if not self.throttle_requests or self.last_request_time is None:
             return
-        time_since_last_request = \
-            (datetime.now() - self.last_request_time).total_seconds()
+        # Monotonic clock is not affected by system time changes
+        time_since_last_request = time.monotonic() - self.last_request_time
         if time_since_last_request < self.throttle_timeout_sec:
             wait_time = self.throttle_timeout_sec - time_since_last_request
             logger_cli.debug("...throttle request. "
@@ -232,7 +234,7 @@ class apiClient:
                     f"Request to '{endpoint}' failed: {type(e).__name__}",
                     endpoint=endpoint) from None
             finally:
-                self.last_request_time = datetime.now()
+                self.last_request_time = time.monotonic()
 
             status = response.status_code
             if status == 429:

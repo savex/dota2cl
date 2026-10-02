@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - The cache timeout was hard-coded in the client, ignoring the constant.
+- With throttling on, the first request waited about a second for no reason.
+  The throttle now uses a monotonic clock.
+- Console log colors are used only when stderr is a terminal, and can be
+  turned off with `NO_COLOR` or `TERM=dumb`.
 - API timestamps ending in `Z` failed to parse on Python 3.10.
 - `cover.sh` returned success when tests failed.
 - Top teams report modified player data stored in the API client cache.

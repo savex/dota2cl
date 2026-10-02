@@ -209,6 +209,33 @@ class TestDota2ClientErrors(DotClientTestBase):
             [5.0, _dt2cl.retry_backoff_sec * 2])
 
     @mock.patch('dotclient.dota2cl.time.sleep')
+    def test_throttle_skips_first_request(self, mock_sleep):
+        _dt2cl = self._make_client(throttle=True, throttle_timeout_sec=10)
+        _ok = MockResponse([{"account_id": 1}], 200)
+        with mock.patch('requests.get', return_value=_ok):
+            with self.redirect_output():
+                _dt2cl.get("proPlayers")
+                # Nothing was requested before, so no wait
+                mock_sleep.assert_not_called()
+                _dt2cl.get("proPlayers")
+        # Second request comes right after the first one
+        mock_sleep.assert_called_once()
+        self.assertAlmostEqual(mock_sleep.call_args.args[0], 10, delta=1)
+
+    @mock.patch('dotclient.dota2cl.time.sleep')
+    def test_throttle_uses_monotonic_clock(self, mock_sleep):
+        # A wall clock change must not affect the wait time
+        _dt2cl = self._make_client(throttle=True, throttle_timeout_sec=10)
+        _ok = MockResponse([{"account_id": 1}], 200)
+        with mock.patch('requests.get', return_value=_ok), \
+                mock.patch('dotclient.dota2cl.time.monotonic',
+                           side_effect=[100.0, 104.0, 110.0]):
+            with self.redirect_output():
+                _dt2cl.get("proPlayers")
+                _dt2cl.get("proPlayers")
+        mock_sleep.assert_called_once_with(6.0)
+
+    @mock.patch('dotclient.dota2cl.time.sleep')
     def test_rate_limit_exhausted(self, mock_sleep):
         from dotclient.exceptions import RateLimitError
         _dt2cl = self._make_client()
