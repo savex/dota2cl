@@ -31,6 +31,8 @@ pip install .
 dotclient --version
 ```
 
+The application can also be run as a module with `python -m dotclient`.
+
 For development, install in editable mode with test dependencies:
 
 ```bash

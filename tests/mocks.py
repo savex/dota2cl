@@ -26,13 +26,13 @@ def load_from_res(_filename, mode='rt'):
     return _patch_buf
 
 
-_handle_proPlayers = urlparse.urljoin(
+_handle_pro_players = urlparse.urljoin(
     opendota_api_base_url + "/", "proPlayers")
 _handle_teams = urlparse.urljoin(opendota_api_base_url + "/", "teams")
 _handle_team = urlparse.urljoin(opendota_api_base_url + "/", "teams/1")
 
 _handle_map = {
-    _handle_proPlayers: "_fake_players.json",
+    _handle_pro_players: "_fake_players.json",
     _handle_teams: "_fake_teams.json",
     _handle_team: "_fake_team.json"
 }

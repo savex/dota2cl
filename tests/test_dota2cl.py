@@ -3,7 +3,7 @@ from unittest import mock
 
 from tests.test_base import DotClientTestBase
 from tests.mocks import MockResponse, mocked_requests_get, \
-    _handle_proPlayers, \
+    _handle_pro_players, \
     _handle_teams, _handle_team, _handle_map, load_from_res
 
 
@@ -18,18 +18,18 @@ class TestDota2Client(DotClientTestBase):
         'requests.get',
         side_effect=mocked_requests_get
     )
-    def test_get_proPlayers(self, mock_get):
+    def test_get_pro_players(self, mock_get):
         _m = self._try_import("dotclient.dota2cl")
         if _m is None:
             self.skipTest("dota2cl module not available")
         else:
             try:
-                _dt2cl = _m.dota2cl.dota2cl()
+                _dt2cl = _m.dota2cl.Dota2Client()
             except Exception as e:
                 self.fail(f"Failed to initialize dota2cl client: {e}")
             else:
                 _expected = json.loads(
-                    load_from_res(_handle_map[_handle_proPlayers]))
+                    load_from_res(_handle_map[_handle_pro_players]))
                 _errors = []
 
                 # Call the method with patched data
@@ -42,7 +42,7 @@ class TestDota2Client(DotClientTestBase):
                 self.assertNotEqual(
                     len(_buf),
                     0,
-                    "Empty buffer returned by '_handle_proPlayers'"
+                    "Empty buffer returned by '_handle_pro_players'"
                 )
                 self.assertEqual(
                     _buf,
@@ -59,7 +59,7 @@ class TestDota2Client(DotClientTestBase):
         if _m is None:
             self.skipTest("dota2cl module not available")
         else:
-            _dt2cl = _m.dota2cl.dota2cl()
+            _dt2cl = _m.dota2cl.Dota2Client()
             _expected = json.loads(
                 load_from_res(_handle_map[_handle_teams]))
             _errors = []
@@ -91,7 +91,7 @@ class TestDota2Client(DotClientTestBase):
         if _m is None:
             self.skipTest("dota2cl module not available")
         else:
-            _dt2cl = _m.dota2cl.dota2cl()
+            _dt2cl = _m.dota2cl.Dota2Client()
             _expected = json.loads(
                 load_from_res(_handle_map[_handle_team]))
             _errors = []
@@ -120,9 +120,9 @@ class TestDota2Client(DotClientTestBase):
         side_effect=mocked_requests_get
     )
     def test_invalid_endpoint_raises(self, mock_get):
-        from dotclient.dota2cl import dota2cl
+        from dotclient.dota2cl import Dota2Client
         from dotclient.exceptions import InvalidEndpointError
-        _dt2cl = dota2cl()
+        _dt2cl = Dota2Client()
         _calls = mock_get.call_count
 
         # Plain and paginated requests to an unknown endpoint must raise
@@ -144,9 +144,9 @@ class TestDota2ClientErrors(DotClientTestBase):
     _fake_key = "secret-key-123"
 
     def _make_client(self, **kwargs):
-        from dotclient.dota2cl import dota2cl
+        from dotclient.dota2cl import Dota2Client
         with mock.patch('requests.get', side_effect=mocked_requests_get):
-            return dota2cl(**kwargs)
+            return Dota2Client(**kwargs)
 
     def test_client_options(self):
         _dt2cl = self._make_client(
@@ -163,11 +163,11 @@ class TestDota2ClientErrors(DotClientTestBase):
         self.assertEqual(_get.call_args.kwargs["timeout"], 5)
 
     def test_schema_load_failure_disables_validation(self):
-        from dotclient.dota2cl import dota2cl
+        from dotclient.dota2cl import Dota2Client
         from requests.exceptions import ConnectionError
         with mock.patch('requests.get', side_effect=ConnectionError("down")):
             with self.redirect_output():
-                _dt2cl = dota2cl()
+                _dt2cl = Dota2Client()
         self.assertEqual(_dt2cl.schema, {})
         self.assertFalse(_dt2cl.rest_handle_validation)
 

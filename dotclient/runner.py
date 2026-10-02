@@ -4,10 +4,10 @@ from dotclient import __version__
 from dotclient.arguments import parse_args, parse_config_path
 from dotclient.config import load_settings
 from dotclient.const import title
-from dotclient.dota2cl import dota2cl
+from dotclient.dota2cl import Dota2Client
 from dotclient.exceptions import ConfigError, DotClientError
 from dotclient.log import logger_cli, logger, set_log_level, setup_log_file
-from dotclient.reporter import topTeamsReport
+from dotclient.reporter import TopTeamsReport
 
 
 def run() -> None:
@@ -42,9 +42,9 @@ def run() -> None:
 
     # Generate report
     try:
-        topTeamsReport(
+        TopTeamsReport(
             args,
-            api_client=dota2cl(
+            api_client=Dota2Client(
                 api_key=api["key"] or None,
                 throttle=args.throttle,
                 base_url=api["base_url"],

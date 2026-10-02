@@ -17,7 +17,7 @@ from dotclient.log import logger_cli, logger
 from dotclient.utils import secrets_filter
 
 
-class apiClient:
+class ApiClient:
     """
     Simple API client that loads schema from root endpoint and validates
     endpoints before making requests. It also handles throttle of requests.
@@ -261,10 +261,10 @@ class apiClient:
             return response
 
 
-class dota2cl(apiClient):
+class Dota2Client(ApiClient):
     def __init__(self, api_key: str | None = None, throttle: bool = False,
                  base_url: str = opendota_api_base_url, **options):
-        # options are the apiClient timeout, retry and cache settings
+        # options are the ApiClient timeout, retry and cache settings
         super().__init__(base_url, api_key, throttle=throttle, **options)
 
     def get_pro_players(self) -> dict:

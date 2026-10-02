@@ -11,30 +11,30 @@ class TestReporterTime(DotClientTestBase):
     Parsing of player history timestamps and experience calculation.
     """
     def _make_report(self, players):
-        from dotclient.reporter import topTeamsReport
+        from dotclient.reporter import TopTeamsReport
         _client = mock.Mock()
         _client.get_pro_players.return_value = players
         _client.get_team_by_id.return_value = {}
         _args = SimpleNamespace(output=io.StringIO(), throttle=False,
                                 num_teams=5, preload_teams=False)
-        return topTeamsReport(_args, api_client=_client)
+        return TopTeamsReport(_args, api_client=_client)
 
     def test_parse_time_formats(self):
-        from dotclient.reporter import dotaReporter
+        from dotclient.reporter import DotaReporter
         _expected = datetime(2025, 2, 21, 10, 0, 14, 982000,
                              tzinfo=timezone.utc)
         self.assertEqual(
-            dotaReporter.parse_time("2025-02-21T10:00:14.982Z"), _expected)
+            DotaReporter.parse_time("2025-02-21T10:00:14.982Z"), _expected)
         # No fractional seconds
         self.assertEqual(
-            dotaReporter.parse_time("2025-02-21T10:00:14Z"),
+            DotaReporter.parse_time("2025-02-21T10:00:14Z"),
             _expected.replace(microsecond=0))
         # No timezone is treated as UTC
         self.assertEqual(
-            dotaReporter.parse_time("2025-02-21T10:00:14.982"), _expected)
+            DotaReporter.parse_time("2025-02-21T10:00:14.982"), _expected)
         for _bad in ("not a date", "", None):
             with self.assertRaises((ValueError, TypeError)):
-                dotaReporter.parse_time(_bad)
+                DotaReporter.parse_time(_bad)
 
     def test_experience_uses_utc(self):
         # History started exactly 1 hour ago in UTC, so experience must be
@@ -79,14 +79,14 @@ class TestReporterTeamLookup(DotClientTestBase):
                 "full_history_time": self._history}
 
     def _report_players(self, players, preload_teams=True):
-        from dotclient.reporter import topTeamsReport
+        from dotclient.reporter import TopTeamsReport
         _client = mock.Mock()
         _client.get_pro_players.return_value = players
         _client.get_teams.return_value = self._teams
         _client.get_team_by_id.return_value = {}
         _args = SimpleNamespace(output=io.StringIO(), throttle=False,
                                 num_teams=5, preload_teams=preload_teams)
-        _report = topTeamsReport(_args, api_client=_client)
+        _report = TopTeamsReport(_args, api_client=_client)
         with self.redirect_output():
             _report.generate_payload()
         return {t["Team ID"]: [p["Personaname"] for p in t["Players"]]
@@ -141,10 +141,10 @@ class TestReporterPayload(DotClientTestBase):
     Report payload state and saving.
     """
     def _make_report(self):
-        from dotclient.reporter import topTeamsReport
+        from dotclient.reporter import TopTeamsReport
         _args = SimpleNamespace(output=io.StringIO(), throttle=False,
                                 num_teams=5, preload_teams=False)
-        return topTeamsReport(_args, api_client=mock.Mock())
+        return TopTeamsReport(_args, api_client=mock.Mock())
 
     def test_payload_not_shared(self):
         _first = self._make_report()

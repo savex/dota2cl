@@ -43,6 +43,8 @@ def parse_args(settings: dict | None = None,
     """
     settings = settings or DEFAULTS
     parser = ArgumentParser(
+        # Fixed name, as 'python -m dotclient' would show '__main__.py'
+        prog="dotclient",
         description="Find the DOTA 2 teams with the most combined player *experience",  # noqa: E501
         epilog="*Experience is defined as the length of a player's recorded history.",  # noqa: E501
     )

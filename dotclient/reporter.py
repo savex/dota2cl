@@ -5,12 +5,12 @@ import ruamel.yaml
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
-from dotclient.dota2cl import dota2cl
+from dotclient.dota2cl import Dota2Client
 from dotclient.exceptions import ApiRequestError
 from dotclient.log import logger_cli
 
 
-class dotaReporter(ABC):
+class DotaReporter(ABC):
     """Base class for reporting data from the API client."""
 
     def __init__(self, args) -> None:
@@ -58,9 +58,9 @@ class dotaReporter(ABC):
         self.yaml.dump(payload, self.output)
 
 
-class topTeamsReport(dotaReporter):
+class TopTeamsReport(DotaReporter):
     """Report for top teams by combined player experience."""
-    def __init__(self, args, api_client: dota2cl) -> None:
+    def __init__(self, args, api_client: Dota2Client) -> None:
         super().__init__(args)
         self.teams_count = args.num_teams
         self.preload_teams = args.preload_teams
