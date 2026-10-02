@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Packaging moved from `setup.py` to `pyproject.toml`.
 - Minimum supported Python version is 3.10.
 - Test runner exits with a non-zero code when tests fail.
+- Team lookup by name for players with `team_id` 0 uses an index built once,
+  instead of scanning all teams for every player.
 
 ### Removed
 - Unused `six` dependency.
@@ -24,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - API timestamps ending in `Z` failed to parse on Python 3.10.
 - `cover.sh` returned success when tests failed.
+- Top teams report modified player data stored in the API client cache.
+- Report payload was a class attribute shared by all reports, and
+  `save_payload()` ignored its argument.
 
 ## [0.1.1] - 2026-10-01
 

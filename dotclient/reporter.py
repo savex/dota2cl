@@ -12,10 +12,12 @@ from dotclient.log import logger_cli
 
 class dotaReporter(ABC):
     """Base class for reporting data from the API client."""
-    payload: dict = {}
 
     def __init__(self, args) -> None:
         # TODO: Add jinja2 support to render report as HTML or Markdown
+        # Set per instance, as a class level dict would be shared
+        # between all reports
+        self.payload: dict = {}
         self.output = args.output
         self.yaml = ruamel.yaml.YAML()
         self.yaml.preserve_quotes = True
@@ -53,7 +55,7 @@ class dotaReporter(ABC):
 
     def save_payload(self, payload: dict) -> None:
         # TODO: Add option to save as JSON or YAML
-        self.yaml.dump(self.payload, self.output)
+        self.yaml.dump(payload, self.output)
 
 
 class topTeamsReport(dotaReporter):
@@ -64,18 +66,86 @@ class topTeamsReport(dotaReporter):
         self.preload_teams = args.preload_teams
         self.api_client = api_client
 
+    @staticmethod
+    def _group_teams_by(teams, key: str) -> dict[str, list[dict]]:
+        """
+        Group teams by the value of the given key, e.g. 'name' or 'tag'.
+        Values are not guaranteed to be unique, so each maps to a list.
+        """
+        grouped: dict[str, list[dict]] = {}
+        for team in teams:
+            grouped.setdefault(team.get(key), []).append(team)
+        return grouped
+
+    @staticmethod
+    def _resolve_team_id(player: dict,
+                         teams_by_name: dict[str, list[dict]] | None
+                         ) -> int | None:
+        """
+        Return the player's team ID, or None if the player
+        cannot be assigned to a team.
+        There is a discrepancy in the API where some players have
+        team_id == 0, but there is no team with ID 0. Those are looked up
+        by team name instead. teams_by_name is None when teams data
+        is not preloaded.
+        """
+        team_id = player.get("team_id")
+        if team_id != 0:
+            return team_id
+
+        _player_name = player.get("personaname")
+        if teams_by_name is None:
+            # No name lookup possible as it will generate
+            # a lot of requests
+            logger_cli.warning(
+                f"Player '{_player_name}' "
+                "has team_id 0 and teams data is not preloaded")
+            return None
+
+        team_name = player.get("team_name")
+        if team_name is None:
+            # Corrupted data, team_id is 0 and no team_name
+            logger_cli.warning(
+                f"Player '{_player_name}' has team_id 0 and no team_name")
+            return None
+
+        matches = teams_by_name.get(team_name, [])
+        if len(matches) > 1:
+            # Additional logic of data matching could be implemented here
+            # to try to find the correct team, but for now skip the player
+            logger_cli.warning(
+                f"Multiple teams found with name '{team_name}' "
+                f"for player '{_player_name}'")
+            return None
+        if not matches:
+            logger_cli.warning(
+                f"No team found with name '{team_name}' "
+                f"for player '{_player_name}'")
+            return None
+
+        # The only proper output is when count is 1
+        team_id = matches[0].get("team_id")
+        logger_cli.debug(
+            f"Found team ID {team_id} for player '{_player_name}' "
+            f"with team name '{team_name}'")
+        return team_id
+
     def generate_payload(self) -> None:
         """Creates a report of the top teams by combined player experience."""
         if self.preload_teams:
             teams_data = {t["team_id"]: t for t in self.api_client.get_teams()}
+            # I've chosen to use team name
+            # It could be possible to use team tag too
+            teams_by_name = self._group_teams_by(teams_data.values(), "name")
         else:
             teams_data = {}
+            teams_by_name = None
 
         players = self.api_client.get_pro_players()
         # Calculate experience for each player
         # and create teams with their players
 
-        # it looks messy, but it is more efficient to do it in one pass
+        # it is more efficient to do it in one pass
         # instead of multiple passes over the data
         teams = {}
         # API timestamps are in UTC, so compare against UTC time.
@@ -95,71 +165,21 @@ class topTeamsReport(dotaReporter):
                     f"'{player.get('full_history_time')}', skipping")
                 continue
             _experience = (_now - _history_start).total_seconds()
+            # Player dicts are shared with the API client cache,
+            # so work on a copy to keep cached data unchanged.
+            # Shallow copy is enough as only top-level keys are set.
+            player = dict(player)
             player["experience"] = _experience
 
-            team_id = player.get("team_id")
-            if team_id is not None:
-                if team_id == 0:
-                    # There is a discrepancy in the API where some players
-                    # have team_id == 0, but there is no team with ID 0.
-                    # Try to look up the team by name instead.
-                    if self.preload_teams:
-                        # I've chosen to use team name
-                        # It could be possible to use team_tag too
-                        # TODO: move this to portable method with targeted key support. # noqa E501
-                        team_name = player.get("team_name")
-                        if team_name is not None:
-                            filtered_teams = [t for t in teams_data.values()
-                                              if t.get("name") == team_name]
-                            _filtered_size = len(filtered_teams)
-                            if _filtered_size > 1:
-                                # Additional logic of data matching could be
-                                # implemented here to try to find the correct
-                                # team, but for now just log a warning and
-                                # skip the player
-                                logger_cli.warning(
-                                    "Multiple teams found with "
-                                    f"name '{team_name}' for player "
-                                    f"'{player.get('personaname')}'")
-                                continue
-                            elif _filtered_size == 0:
-                                # No such team found,
-                                # log a warning and skip the player
-                                logger_cli.warning(
-                                    f"No team found with name '{team_name}' "
-                                    f"for player '{player.get('personaname')}'")  # noqa: E501
-                                player["team_id"] = None
-                                continue
-                            else:
-                                # The only proper output is when count is 1
-                                new_team_id = filtered_teams[0].get("team_id")
-                                logger_cli.debug(
-                                    f"Found team ID {new_team_id} for "
-                                    f"player '{player.get('personaname')}' "
-                                    f"with team name '{team_name}'")
-                                player["team_id"] = new_team_id
-                                team_id = new_team_id
-                        else:
-                            # Corrupted data, team_id is 0 and no team_name
-                            logger_cli.warning(
-                                f"Player '{player.get('personaname')}' "
-                                "has team_id 0 and no team_name")
-                            player["team_id"] = None
-                            continue
-                    else:
-                        # No name lookup possible as it will generate
-                        # a lot of requests, just log a warning
-                        # and skip the player
-                        logger_cli.warning(
-                            f"Player '{player.get('personaname')}' "
-                            "has team_id 0 and teams data is not preloaded")
-                        player["team_id"] = None
-                        continue
+            team_id = self._resolve_team_id(player, teams_by_name)
+            player["team_id"] = team_id
+            if team_id is None:
+                continue
 
-                if team_id not in teams:
-                    teams[team_id] = {"experience": 0, "players": []}
-                teams[team_id]["players"].append(player)
-                teams[team_id]["experience"] += player["experience"]
+            if team_id not in teams:
+                teams[team_id] = {"experience": 0, "players": []}
+            teams[team_id]["players"].append(player)
+            teams[team_id]["experience"] += player["experience"]
 
         # Sort teams by combined player experience
         sorted_teams = sorted(
