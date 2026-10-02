@@ -159,3 +159,68 @@ class TestReporterPayload(DotClientTestBase):
         _out = _report.output.getvalue()
         self.assertIn("fresh", _out)
         self.assertNotIn("stale", _out)
+
+
+class TestReporterTeamDetails(DotClientTestBase):
+    """
+    Team details lookup for the top teams.
+    """
+    def test_failed_team_details_keep_team_in_report(self):
+        from dota2cl.exceptions import ApiRequestError, NotFoundError
+        from dota2cl.reporter import TopTeamsReport
+        _history = "2025-02-21T10:00:14Z"
+        _client = mock.Mock()
+        _client.get_pro_players.return_value = [
+            {"personaname": "a", "team_id": 1,
+             "full_history_time": _history},
+            {"personaname": "b", "team_id": 2,
+             "full_history_time": _history},
+            {"personaname": "c", "team_id": 3,
+             "full_history_time": _history},
+        ]
+        _details = {
+            1: {"name": "Alpha", "wins": 10, "losses": 2, "rating": 1500},
+            2: NotFoundError("Resource 'teams/2' not found"),
+            3: ApiRequestError("Request failed with HTTP 500",
+                               status_code=500),
+        }
+
+        def _get_team(team_id):
+            _value = _details[team_id]
+            if isinstance(_value, Exception):
+                raise _value
+            return _value
+
+        _client.get_team_by_id.side_effect = _get_team
+        _args = SimpleNamespace(output=io.StringIO(), throttle=False,
+                                num_teams=5, preload_teams=False)
+        _report = TopTeamsReport(_args, api_client=_client)
+        with self.redirect_output():
+            _report.generate_payload()
+
+        _teams = {t["Team ID"]: t for t in _report.payload["top_teams"]}
+        # All teams are in the report, including the failed ones
+        self.assertEqual(set(_teams), {1, 2, 3})
+        self.assertEqual(_teams[1]["Team Name"], "Alpha")
+        self.assertEqual(_teams[1]["Wins"], 10)
+        for _team_id in (2, 3):
+            _team = _teams[_team_id]
+            for _field in ("Team Name", "Wins", "Losses", "Rating"):
+                self.assertIsNone(_team[_field], msg=(_team_id, _field))
+            # Data that doesn't come from team details is still there
+            self.assertEqual(len(_team["Players"]), 1)
+            self.assertGreater(_team["Team Experience"], 0)
+
+    def test_other_errors_are_not_hidden(self):
+        # Only API request errors are turned into empty details
+        from dota2cl.reporter import TopTeamsReport
+        _client = mock.Mock()
+        _client.get_pro_players.return_value = [
+            {"personaname": "a", "team_id": 1,
+             "full_history_time": "2025-02-21T10:00:14Z"}]
+        _client.get_team_by_id.side_effect = KeyError("unexpected")
+        _args = SimpleNamespace(output=io.StringIO(), throttle=False,
+                                num_teams=5, preload_teams=False)
+        with self.assertRaises(KeyError):
+            with self.redirect_output():
+                TopTeamsReport(_args, api_client=_client).generate_payload()

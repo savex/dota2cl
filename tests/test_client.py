@@ -24,7 +24,7 @@ class TestDota2Client(DotClientTestBase):
             self.skipTest("dota2cl module not available")
         else:
             try:
-                _dt2cl = _m.client.Dota2Client()
+                _dt2cl = _m.Dota2Client()
             except Exception as e:
                 self.fail(f"Failed to initialize dota2cl client: {e}")
             else:
@@ -33,9 +33,10 @@ class TestDota2Client(DotClientTestBase):
                 _errors = []
 
                 # Call the method with patched data
-                _buf, _msg = self._safe_run(
-                    _dt2cl.get_pro_players
-                )
+                with self.redirect_output():
+                    _buf, _msg = self._safe_run(
+                        _dt2cl.get_pro_players
+                    )
                 if _msg:
                     _errors.append(_msg)
 
@@ -59,15 +60,16 @@ class TestDota2Client(DotClientTestBase):
         if _m is None:
             self.skipTest("dota2cl module not available")
         else:
-            _dt2cl = _m.client.Dota2Client()
+            _dt2cl = _m.Dota2Client()
             _expected = json.loads(
                 load_from_res(_handle_map[_handle_teams]))
             _errors = []
 
             # Call the method with patched data
-            _buf, _msg = self._safe_run(
-                _dt2cl.get_teams
-            )
+            with self.redirect_output():
+                _buf, _msg = self._safe_run(
+                    _dt2cl.get_teams
+                )
             if _msg:
                 _errors.append(_msg)
 
@@ -91,16 +93,17 @@ class TestDota2Client(DotClientTestBase):
         if _m is None:
             self.skipTest("dota2cl module not available")
         else:
-            _dt2cl = _m.client.Dota2Client()
+            _dt2cl = _m.Dota2Client()
             _expected = json.loads(
                 load_from_res(_handle_map[_handle_team]))
             _errors = []
 
             # Call the method with patched data
-            _buf, _msg = self._safe_run(
-                _dt2cl.get_team_by_id,
-                1
-            )
+            with self.redirect_output():
+                _buf, _msg = self._safe_run(
+                    _dt2cl.get_team_by_id,
+                    1
+                )
             if _msg:
                 _errors.append(_msg)
 
@@ -159,7 +162,8 @@ class TestDota2ClientErrors(DotClientTestBase):
         self.assertEqual(_dt2cl.cache_request_timeout_sec, 600)
         with mock.patch('requests.get',
                         side_effect=mocked_requests_get) as _get:
-            _dt2cl.get_pro_players()
+            with self.redirect_output():
+                _dt2cl.get_pro_players()
         self.assertEqual(_get.call_args.kwargs["timeout"], 5)
 
     def test_schema_load_failure_disables_validation(self):
@@ -278,3 +282,106 @@ class TestDota2ClientErrors(DotClientTestBase):
             with self.redirect_output():
                 with self.assertRaises(InvalidResponseError):
                     _dt2cl.get_teams()
+
+
+class TestDota2ClientCache(DotClientTestBase):
+    """
+    Response caching and cache expiry.
+    """
+    def _make_client(self, **kwargs):
+        from dota2cl.client import Dota2Client
+        with mock.patch('requests.get', side_effect=mocked_requests_get):
+            return Dota2Client(**kwargs)
+
+    def test_cached_data_reused_before_expiry(self):
+        _dt2cl = self._make_client(cache_timeout_sec=60)
+        with mock.patch.object(_dt2cl, "get",
+                               return_value=[{"account_id": 1}]) as _get:
+            with self.redirect_output():
+                _first = _dt2cl.get_pro_players()
+                _second = _dt2cl.get_pro_players()
+        self.assertEqual(_get.call_count, 1)
+        self.assertEqual(_first, _second)
+
+    def test_expired_cache_returns_fresh_data(self):
+        # Bug 3: data was fetched again after expiry,
+        # but the old cached data was returned
+        _dt2cl = self._make_client(cache_timeout_sec=60)
+        _old, _new = [{"account_id": 1}], [{"account_id": 2}]
+        with mock.patch.object(_dt2cl, "get",
+                               side_effect=[_old, _new]) as _get:
+            with self.redirect_output():
+                self.assertEqual(_dt2cl.get_pro_players(), _old)
+                # Make the cached entry older than the timeout
+                _dt2cl._cache["proPlayers"]["timestamp"] -= 61
+                self.assertEqual(_dt2cl.get_pro_players(), _new)
+                # The fresh data is cached as well
+                self.assertEqual(_dt2cl.get_pro_players(), _new)
+        self.assertEqual(_get.call_count, 2)
+
+    def test_cache_is_per_handle(self):
+        _dt2cl = self._make_client()
+        with mock.patch.object(_dt2cl, "get",
+                               side_effect=[{"team_id": 1},
+                                            {"team_id": 2}]) as _get:
+            with self.redirect_output():
+                self.assertEqual(_dt2cl.get_team_by_id(1), {"team_id": 1})
+                self.assertEqual(_dt2cl.get_team_by_id(2), {"team_id": 2})
+                self.assertEqual(_dt2cl.get_team_by_id(1), {"team_id": 1})
+        self.assertEqual(_get.call_count, 2)
+
+
+class TestDota2ClientPagination(DotClientTestBase):
+    """
+    Paginated requests collect all pages.
+    """
+    def _paginate(self, pages, page_size, api_key=None):
+        """
+        Run a paginated request where the API returns the given pages.
+        Returns the collected data and the requested page numbers.
+        """
+        from dota2cl.client import Dota2Client
+        with mock.patch('requests.get', side_effect=mocked_requests_get):
+            _dt2cl = Dota2Client(api_key=api_key)
+        _requested = []
+
+        def _fake_get(url, params=None, **kwargs):
+            _requested.append(dict(params))
+            _page = params["page"]
+            return MockResponse(pages[_page] if _page < len(pages) else [],
+                                200)
+
+        with mock.patch('requests.get', side_effect=_fake_get):
+            with self.redirect_output():
+                _data = _dt2cl._get_cached_item("teams", page_size=page_size)
+        return _data, _requested
+
+    def test_collects_all_pages(self):
+        _pages = [[{"team_id": 1}, {"team_id": 2}],
+                  [{"team_id": 3}, {"team_id": 4}],
+                  [{"team_id": 5}]]
+        _data, _requested = self._paginate(_pages, page_size=2)
+        self.assertEqual([t["team_id"] for t in _data], [1, 2, 3, 4, 5])
+        # Stops after the short page, no extra request
+        self.assertEqual([p["page"] for p in _requested], [0, 1, 2])
+
+    def test_stops_on_empty_page(self):
+        # Item count is an exact multiple of the page size,
+        # so only an empty page shows the end
+        _pages = [[{"team_id": 1}, {"team_id": 2}],
+                  [{"team_id": 3}, {"team_id": 4}]]
+        _data, _requested = self._paginate(_pages, page_size=2)
+        self.assertEqual(len(_data), 4)
+        self.assertEqual([p["page"] for p in _requested], [0, 1, 2])
+
+    def test_single_short_page(self):
+        _data, _requested = self._paginate([[{"team_id": 1}]], page_size=2)
+        self.assertEqual(_data, [{"team_id": 1}])
+        self.assertEqual(len(_requested), 1)
+
+    def test_api_key_sent_with_every_page(self):
+        _pages = [[{"team_id": 1}, {"team_id": 2}], [{"team_id": 3}]]
+        _, _requested = self._paginate(_pages, page_size=2,
+                                       api_key="secret-key")
+        self.assertEqual([p.get("key") for p in _requested],
+                         ["secret-key", "secret-key"])
