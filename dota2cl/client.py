@@ -7,14 +7,14 @@ import urllib.parse as urlparse
 from datetime import datetime
 from requests.exceptions import RequestException
 
-from dotclient.const import api_client_throttle_timeout_sec, \
+from dota2cl.const import api_client_throttle_timeout_sec, \
     resource_cache_timeout_sec, opendota_api_base_url, \
     requests_timeout_sec, api_client_max_retries, \
     api_client_retry_backoff_sec
-from dotclient.exceptions import ApiRequestError, InvalidEndpointError, \
+from dota2cl.exceptions import ApiRequestError, InvalidEndpointError, \
     InvalidResponseError, NotFoundError, RateLimitError, SchemaLoadError
-from dotclient.log import logger_cli, logger
-from dotclient.utils import secrets_filter
+from dota2cl.log import logger_cli, logger
+from dota2cl.utils import secrets_filter
 
 
 class ApiClient:

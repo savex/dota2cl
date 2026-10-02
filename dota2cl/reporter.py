@@ -5,9 +5,9 @@ import ruamel.yaml
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
-from dotclient.dota2cl import Dota2Client
-from dotclient.exceptions import ApiRequestError
-from dotclient.log import logger_cli
+from dota2cl.client import Dota2Client
+from dota2cl.exceptions import ApiRequestError
+from dota2cl.log import logger_cli
 
 
 class DotaReporter(ABC):

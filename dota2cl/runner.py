@@ -1,13 +1,13 @@
 import sys
 
-from dotclient import __version__
-from dotclient.arguments import parse_args, parse_config_path
-from dotclient.config import load_settings
-from dotclient.const import title
-from dotclient.dota2cl import Dota2Client
-from dotclient.exceptions import ConfigError, DotClientError
-from dotclient.log import logger_cli, logger, set_log_level, setup_log_file
-from dotclient.reporter import TopTeamsReport
+from dota2cl import __version__
+from dota2cl.arguments import parse_args, parse_config_path
+from dota2cl.config import load_settings
+from dota2cl.const import title
+from dota2cl.client import Dota2Client
+from dota2cl.exceptions import ConfigError, DotClientError
+from dota2cl.log import logger_cli, logger, set_log_level, setup_log_file
+from dota2cl.reporter import TopTeamsReport
 
 
 def run() -> None:

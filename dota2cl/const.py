@@ -1,14 +1,15 @@
 #    Author: Alex Savatieiev (a.savex@gmail.com)
 #    November 2025
 
-# This file contains constants used across the dotclient package.
+# This file contains constants used across the dota2cl package.
 # It is a good idea to place any hardcoded values here in case they
 # need to be updated in the future.
 # Most of these are application defaults that can be overridden
-# in the config file, see dotclient/config.py.
+# in the config file, see dota2cl/config.py.
 
-title = "dota2client"
 app_name = "dota2cl"
+# Shown in console output and used as the logger name
+title = app_name
 
 # Config file and log file names
 config_file_name = app_name + ".conf"

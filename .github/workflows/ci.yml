@@ -24,7 +24,7 @@ jobs:
       - name: Run tests with coverage
         run: ./cover.sh
       - name: Check version
-        run: dotclient --version
+        run: dota2cl --version
 
   build:
     runs-on: ubuntu-latest

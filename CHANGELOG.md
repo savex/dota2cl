@@ -21,9 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions workflows for testing and for tagged releases.
 
 ### Changed
+- Renamed to `dota2cl` everywhere. This breaks existing installs and imports:
+  - The command is `dota2cl` instead of `dotclient`.
+  - The package is `dota2cl` instead of `dotclient`, run as `python -m dota2cl`.
+  - The distribution is `dota2cl` instead of `dota2client`. Uninstall the old
+    one with `pip uninstall dota2client`.
+  - The API client module is `dota2cl.client` instead of `dotclient.dota2cl`.
 - Classes renamed to follow PEP 8: `apiClient` to `ApiClient`, `dota2cl` to
   `Dota2Client`, `dotaReporter` to `DotaReporter`, and `topTeamsReport` to
-  `TopTeamsReport`. The `dotclient.dota2cl` module name is unchanged.
+  `TopTeamsReport`.
 - The log file is opened when the application starts instead of on import,
   and is written to the user cache directory, or the current directory
   as a fallback, instead of next to the package.
@@ -35,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of scanning all teams for every player.
 
 ### Removed
-- `main.py`. Run the application with `dotclient` or `python -m dotclient`.
+- `main.py`. Run the application with `dota2cl` or `python -m dota2cl`.
 - `LOGFILE` environment variable. Use `DOTA2CL_LOGGING_FILE` instead.
 - Unused `six` dependency.
 

@@ -4,7 +4,7 @@
 
 class DotClientError(Exception):
     """
-    Base class for all dotclient errors.
+    Base class for all dota2cl errors.
     """
 
 

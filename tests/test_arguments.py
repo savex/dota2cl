@@ -11,8 +11,8 @@ class TestArguments(DotClientTestBase):
     Command line argument parsing.
     """
     def _parse(self, args_list):
-        from dotclient.arguments import parse_args
-        with mock.patch.object(sys, "argv", ["dotclient"] + args_list):
+        from dota2cl.arguments import parse_args
+        with mock.patch.object(sys, "argv", ["dota2cl"] + args_list):
             return parse_args()
 
     def test_defaults(self):
@@ -32,18 +32,18 @@ class TestArguments(DotClientTestBase):
                     self._parse(["-n", _bad])
 
     def test_version_flag(self):
-        from dotclient import __version__
+        from dota2cl import __version__
         _out = io.StringIO()
         with contextlib.redirect_stdout(_out):
             with self.assertRaises(SystemExit) as _exit:
                 self._parse(["--version"])
         self.assertEqual(_exit.exception.code, 0)
-        self.assertEqual(_out.getvalue().strip(), f"dotclient {__version__}")
+        self.assertEqual(_out.getvalue().strip(), f"dota2cl {__version__}")
 
     def test_defaults_from_settings(self):
         from copy import deepcopy
-        from dotclient.arguments import parse_args
-        from dotclient.config import DEFAULTS
+        from dota2cl.arguments import parse_args
+        from dota2cl.config import DEFAULTS
         _settings = deepcopy(DEFAULTS)
         _settings["report"]["num_teams"] = 8
         _settings["api"]["throttle"] = True
@@ -56,7 +56,7 @@ class TestArguments(DotClientTestBase):
         self.assertFalse(_args.throttle)
 
     def test_config_path(self):
-        from dotclient.arguments import parse_config_path
+        from dota2cl.arguments import parse_config_path
         self.assertIsNone(parse_config_path(["-n", "3"]))
         self.assertEqual(
             parse_config_path(["-n", "3", "--config", "/tmp/x.conf"]),

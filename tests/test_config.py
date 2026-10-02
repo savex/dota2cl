@@ -25,7 +25,7 @@ class TestConfig(DotClientTestBase):
         return _path
 
     def _load(self, text="", environ=None):
-        from dotclient.config import load_settings
+        from dota2cl.config import load_settings
         _path = self._write_config(text)
         with self.redirect_output():
             settings, _ = load_settings(_path, environ=environ or {})
@@ -33,7 +33,7 @@ class TestConfig(DotClientTestBase):
 
     def test_bundled_config_matches_defaults(self):
         # The shipped config documents every setting with its default value
-        from dotclient.config import DEFAULTS, load_settings, \
+        from dota2cl.config import DEFAULTS, load_settings, \
             package_config_path
         settings, _path = load_settings(package_config_path, environ={})
         self.assertEqual(settings, DEFAULTS)
@@ -70,7 +70,7 @@ class TestConfig(DotClientTestBase):
         self.assertEqual(_settings["api"]["key"], "dota2cl")
 
     def test_config_env_var_selects_file(self):
-        from dotclient.config import load_settings
+        from dota2cl.config import load_settings
         _path = self._write_config("[report]\nnum_teams = 9\n", "other.conf")
         _settings, _used = load_settings(
             environ={"DOTA2CL_CONFIG": _path})
@@ -78,7 +78,7 @@ class TestConfig(DotClientTestBase):
         self.assertEqual(_settings["report"]["num_teams"], 9)
 
     def test_invalid_values_raise(self):
-        from dotclient.exceptions import ConfigError
+        from dota2cl.exceptions import ConfigError
         for _text in ("[api]\nthrottle = maybe\n",
                       "[api]\nmax_retries = many\n",
                       "[api]\ntimeout_sec = -1\n",
@@ -91,8 +91,8 @@ class TestConfig(DotClientTestBase):
             self._load(environ={"DOTA2CL_REPORT_NUM_TEAMS": "ten"})
 
     def test_missing_config_file_raises(self):
-        from dotclient.config import load_settings
-        from dotclient.exceptions import ConfigError
+        from dota2cl.config import load_settings
+        from dota2cl.exceptions import ConfigError
         with self.assertRaises(ConfigError):
             load_settings(os.path.join(self.tmp_dir, "missing.conf"),
                           environ={})
@@ -110,7 +110,7 @@ class TestConfigLocation(DotClientTestBase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.etc_dir = self._tmp.name
-        self._patch = mock.patch("dotclient.config.system_config_dir",
+        self._patch = mock.patch("dota2cl.config.system_config_dir",
                                  self.etc_dir)
         self._patch.start()
 
@@ -119,14 +119,14 @@ class TestConfigLocation(DotClientTestBase):
         self._tmp.cleanup()
 
     def _default_path(self, linux_like=True):
-        from dotclient import config
+        from dota2cl import config
         with mock.patch.object(config, "is_linux_like",
                                return_value=linux_like):
             with self.redirect_output():
                 return config.default_config_path()
 
     def test_linux_creates_system_config(self):
-        from dotclient.config import package_config_path
+        from dota2cl.config import package_config_path
         _path = self._default_path()
         self.assertEqual(_path, os.path.join(self.etc_dir, "dota2cl.conf"))
         with open(_path) as f, open(package_config_path) as b:
@@ -141,13 +141,13 @@ class TestConfigLocation(DotClientTestBase):
             self.assertEqual(f.read(), "[report]\nnum_teams = 2\n")
 
     def test_linux_unwritable_uses_bundled_config(self):
-        from dotclient.config import package_config_path
-        with mock.patch("dotclient.config.os.access", return_value=False):
+        from dota2cl.config import package_config_path
+        with mock.patch("dota2cl.config.os.access", return_value=False):
             self.assertEqual(self._default_path(), package_config_path)
         self.assertEqual(os.listdir(self.etc_dir), [])
 
     def test_other_systems_use_bundled_config(self):
-        from dotclient.config import package_config_path
+        from dota2cl.config import package_config_path
         self.assertEqual(self._default_path(linux_like=False),
                          package_config_path)
         self.assertEqual(os.listdir(self.etc_dir), [])
@@ -162,7 +162,7 @@ class TestLogFile(DotClientTestBase):
         self.tmp_dir = self._tmp.name
 
     def tearDown(self):
-        from dotclient.log import logger
+        from dota2cl.log import logger
         for _handler in list(logger.handlers):
             if isinstance(_handler, logging.FileHandler):
                 logger.removeHandler(_handler)
@@ -170,7 +170,7 @@ class TestLogFile(DotClientTestBase):
         self._tmp.cleanup()
 
     def _file_handlers(self):
-        from dotclient.log import logger
+        from dota2cl.log import logger
         return [h for h in logger.handlers
                 if isinstance(h, logging.FileHandler)]
 
@@ -178,7 +178,7 @@ class TestLogFile(DotClientTestBase):
         self.assertEqual(self._file_handlers(), [])
 
     def test_default_log_in_user_cache_dir(self):
-        from dotclient import log
+        from dota2cl import log
         _cache = os.path.join(self.tmp_dir, "cache", "dota2cl")
         with mock.patch.object(log, "user_cache_dir", return_value=_cache):
             _path = log.setup_log_file()
@@ -187,7 +187,7 @@ class TestLogFile(DotClientTestBase):
         self.assertEqual(len(self._file_handlers()), 1)
 
     def test_falls_back_to_current_dir(self):
-        from dotclient import log
+        from dota2cl import log
         # A file where the cache folder should be makes it unusable
         _blocker = os.path.join(self.tmp_dir, "blocker")
         open(_blocker, "w").close()
@@ -201,7 +201,7 @@ class TestLogFile(DotClientTestBase):
         self.assertEqual(_path, os.path.join(_cwd, "dota2cl.log"))
 
     def test_configured_log_file(self):
-        from dotclient.log import setup_log_file
+        from dota2cl.log import setup_log_file
         _path = os.path.join(self.tmp_dir, "logs", "app.log")
         self.assertEqual(setup_log_file(_path), _path)
         # Calling again replaces the handler instead of adding one
@@ -209,7 +209,7 @@ class TestLogFile(DotClientTestBase):
         self.assertEqual(len(self._file_handlers()), 1)
 
     def test_user_cache_dir_per_platform(self):
-        from dotclient import log
+        from dota2cl import log
         with mock.patch.object(sys, "platform", "linux"), \
                 mock.patch.dict(os.environ, {"XDG_CACHE_HOME": "/xdg"}):
             self.assertEqual(log.user_cache_dir(),
@@ -235,7 +235,7 @@ class TestColoredOutput(DotClientTestBase):
             return self._tty
 
     def _format(self, use_color):
-        from dotclient.log import ColoredFormatter
+        from dota2cl.log import ColoredFormatter
         _formatter = ColoredFormatter("%(levelname)s%(message)s",
                                       use_color=use_color)
         _record = logging.LogRecord("t", logging.ERROR, "", 0, "msg",
@@ -247,7 +247,7 @@ class TestColoredOutput(DotClientTestBase):
         self.assertEqual(self._format(False), "ERROR   msg")
 
     def test_color_only_on_terminal(self):
-        from dotclient.log import stream_supports_color
+        from dota2cl.log import stream_supports_color
         with mock.patch.dict(os.environ, clear=True):
             self.assertTrue(stream_supports_color(self._Stream(True)))
             self.assertFalse(stream_supports_color(self._Stream(False)))
@@ -255,7 +255,7 @@ class TestColoredOutput(DotClientTestBase):
             self.assertFalse(stream_supports_color(object()))
 
     def test_color_disabled_by_env(self):
-        from dotclient.log import stream_supports_color
+        from dota2cl.log import stream_supports_color
         for _env in ({"NO_COLOR": "1"}, {"TERM": "dumb"}):
             with mock.patch.dict(os.environ, _env, clear=True):
                 self.assertFalse(stream_supports_color(self._Stream(True)),

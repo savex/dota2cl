@@ -19,12 +19,12 @@ class TestDota2Client(DotClientTestBase):
         side_effect=mocked_requests_get
     )
     def test_get_pro_players(self, mock_get):
-        _m = self._try_import("dotclient.dota2cl")
+        _m = self._try_import("dota2cl.client")
         if _m is None:
             self.skipTest("dota2cl module not available")
         else:
             try:
-                _dt2cl = _m.dota2cl.Dota2Client()
+                _dt2cl = _m.client.Dota2Client()
             except Exception as e:
                 self.fail(f"Failed to initialize dota2cl client: {e}")
             else:
@@ -55,11 +55,11 @@ class TestDota2Client(DotClientTestBase):
         side_effect=mocked_requests_get
     )
     def test_get_teams(self, mock_get):
-        _m = self._try_import("dotclient.dota2cl")
+        _m = self._try_import("dota2cl.client")
         if _m is None:
             self.skipTest("dota2cl module not available")
         else:
-            _dt2cl = _m.dota2cl.Dota2Client()
+            _dt2cl = _m.client.Dota2Client()
             _expected = json.loads(
                 load_from_res(_handle_map[_handle_teams]))
             _errors = []
@@ -87,11 +87,11 @@ class TestDota2Client(DotClientTestBase):
         side_effect=mocked_requests_get
     )
     def test_get_team_by_id(self, mock_get):
-        _m = self._try_import("dotclient.dota2cl")
+        _m = self._try_import("dota2cl.client")
         if _m is None:
             self.skipTest("dota2cl module not available")
         else:
-            _dt2cl = _m.dota2cl.Dota2Client()
+            _dt2cl = _m.client.Dota2Client()
             _expected = json.loads(
                 load_from_res(_handle_map[_handle_team]))
             _errors = []
@@ -120,8 +120,8 @@ class TestDota2Client(DotClientTestBase):
         side_effect=mocked_requests_get
     )
     def test_invalid_endpoint_raises(self, mock_get):
-        from dotclient.dota2cl import Dota2Client
-        from dotclient.exceptions import InvalidEndpointError
+        from dota2cl.client import Dota2Client
+        from dota2cl.exceptions import InvalidEndpointError
         _dt2cl = Dota2Client()
         _calls = mock_get.call_count
 
@@ -144,7 +144,7 @@ class TestDota2ClientErrors(DotClientTestBase):
     _fake_key = "secret-key-123"
 
     def _make_client(self, **kwargs):
-        from dotclient.dota2cl import Dota2Client
+        from dota2cl.client import Dota2Client
         with mock.patch('requests.get', side_effect=mocked_requests_get):
             return Dota2Client(**kwargs)
 
@@ -163,7 +163,7 @@ class TestDota2ClientErrors(DotClientTestBase):
         self.assertEqual(_get.call_args.kwargs["timeout"], 5)
 
     def test_schema_load_failure_disables_validation(self):
-        from dotclient.dota2cl import Dota2Client
+        from dota2cl.client import Dota2Client
         from requests.exceptions import ConnectionError
         with mock.patch('requests.get', side_effect=ConnectionError("down")):
             with self.redirect_output():
@@ -172,7 +172,7 @@ class TestDota2ClientErrors(DotClientTestBase):
         self.assertFalse(_dt2cl.rest_handle_validation)
 
     def test_not_found(self):
-        from dotclient.exceptions import NotFoundError
+        from dota2cl.exceptions import NotFoundError
         _dt2cl = self._make_client()
         with mock.patch('requests.get',
                         return_value=MockResponse(None, 404)):
@@ -182,7 +182,7 @@ class TestDota2ClientErrors(DotClientTestBase):
         self.assertEqual(ctx.exception.endpoint, "teams/999")
 
     def test_http_error(self):
-        from dotclient.exceptions import ApiRequestError, NotFoundError
+        from dota2cl.exceptions import ApiRequestError, NotFoundError
         _dt2cl = self._make_client()
         with mock.patch('requests.get',
                         return_value=MockResponse(None, 500)):
@@ -191,7 +191,7 @@ class TestDota2ClientErrors(DotClientTestBase):
         self.assertNotIsInstance(ctx.exception, NotFoundError)
         self.assertEqual(ctx.exception.status_code, 500)
 
-    @mock.patch('dotclient.dota2cl.time.sleep')
+    @mock.patch('dota2cl.client.time.sleep')
     def test_rate_limit_retry_then_success(self, mock_sleep):
         _dt2cl = self._make_client()
         _responses = [
@@ -208,7 +208,7 @@ class TestDota2ClientErrors(DotClientTestBase):
             [c.args[0] for c in mock_sleep.call_args_list],
             [5.0, _dt2cl.retry_backoff_sec * 2])
 
-    @mock.patch('dotclient.dota2cl.time.sleep')
+    @mock.patch('dota2cl.client.time.sleep')
     def test_throttle_skips_first_request(self, mock_sleep):
         _dt2cl = self._make_client(throttle=True, throttle_timeout_sec=10)
         _ok = MockResponse([{"account_id": 1}], 200)
@@ -222,22 +222,22 @@ class TestDota2ClientErrors(DotClientTestBase):
         mock_sleep.assert_called_once()
         self.assertAlmostEqual(mock_sleep.call_args.args[0], 10, delta=1)
 
-    @mock.patch('dotclient.dota2cl.time.sleep')
+    @mock.patch('dota2cl.client.time.sleep')
     def test_throttle_uses_monotonic_clock(self, mock_sleep):
         # A wall clock change must not affect the wait time
         _dt2cl = self._make_client(throttle=True, throttle_timeout_sec=10)
         _ok = MockResponse([{"account_id": 1}], 200)
         with mock.patch('requests.get', return_value=_ok), \
-                mock.patch('dotclient.dota2cl.time.monotonic',
+                mock.patch('dota2cl.client.time.monotonic',
                            side_effect=[100.0, 104.0, 110.0]):
             with self.redirect_output():
                 _dt2cl.get("proPlayers")
                 _dt2cl.get("proPlayers")
         mock_sleep.assert_called_once_with(6.0)
 
-    @mock.patch('dotclient.dota2cl.time.sleep')
+    @mock.patch('dota2cl.client.time.sleep')
     def test_rate_limit_exhausted(self, mock_sleep):
-        from dotclient.exceptions import RateLimitError
+        from dota2cl.exceptions import RateLimitError
         _dt2cl = self._make_client()
         with mock.patch('requests.get',
                         return_value=MockResponse(None, 429)) as _get:
@@ -248,7 +248,7 @@ class TestDota2ClientErrors(DotClientTestBase):
         self.assertEqual(ctx.exception.status_code, 429)
 
     def test_connection_error_hides_api_key(self):
-        from dotclient.exceptions import ApiRequestError
+        from dota2cl.exceptions import ApiRequestError
         from requests.exceptions import ConnectionError
         _dt2cl = self._make_client(api_key=self._fake_key)
         _err = ConnectionError(
@@ -263,7 +263,7 @@ class TestDota2ClientErrors(DotClientTestBase):
         self.assertIsNone(ctx.exception.__cause__)
 
     def test_invalid_json(self):
-        from dotclient.exceptions import InvalidResponseError
+        from dota2cl.exceptions import InvalidResponseError
         _dt2cl = self._make_client()
         with mock.patch('requests.get',
                         return_value=MockResponse("<html>", 200)):
@@ -271,7 +271,7 @@ class TestDota2ClientErrors(DotClientTestBase):
                 _dt2cl.get("proPlayers")
 
     def test_paginated_non_list_response(self):
-        from dotclient.exceptions import InvalidResponseError
+        from dota2cl.exceptions import InvalidResponseError
         _dt2cl = self._make_client()
         with mock.patch('requests.get',
                         return_value=MockResponse({"rows": []}, 200)):

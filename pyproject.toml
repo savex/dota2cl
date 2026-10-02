@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dota2client"
+name = "dota2cl"
 dynamic = ["version"]
 description = "Simple client for opendota API"
 readme = "README.md"
@@ -25,13 +25,13 @@ dependencies = [
 test = ["coverage"]
 
 [project.scripts]
-dotclient = "dotclient.runner:run"
+dota2cl = "dota2cl.runner:run"
 
 [tool.setuptools]
 zip-safe = false
 
 [tool.setuptools.packages.find]
-include = ["dotclient*"]
+include = ["dota2cl*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.conf", "*.env", "*.list", "*.html"]
@@ -39,4 +39,4 @@ include = ["dotclient*"]
 # Version is taken from the latest git tag (vX.Y.Z).
 # Untagged commits get a dev version, e.g. 0.1.1.dev3+g4ddaef9
 [tool.setuptools_scm]
-version_file = "dotclient/_version.py"
+version_file = "dota2cl/_version.py"

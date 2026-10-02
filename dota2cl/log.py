@@ -9,8 +9,8 @@ import logging
 import os
 import sys
 
-from dotclient.const import app_name, log_file_name, title
-from dotclient.utils import secrets_filter
+from dota2cl.const import app_name, log_file_name, title
+from dota2cl.utils import secrets_filter
 
 
 def color_me(color):

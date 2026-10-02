@@ -1,6 +1,6 @@
 # Overview
 
-The `dotclient` module is a portable client for retrieving data from the OpenDota API.
+The `dota2cl` package is a portable client for retrieving data from the OpenDota API.
 
 ## Design Goals
 
@@ -28,10 +28,10 @@ To work around this, the client can look up a player's team by name. This lookup
 
 ```bash
 pip install .
-dotclient --version
+dota2cl --version
 ```
 
-The application can also be run as a module with `python -m dotclient`.
+The application can also be run as a module with `python -m dota2cl`.
 
 For development, install in editable mode with test dependencies:
 

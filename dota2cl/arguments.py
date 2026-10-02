@@ -4,9 +4,9 @@ from argparse import ArgumentParser, ArgumentTypeError, \
     BooleanOptionalAction, FileType
 from sys import stdout
 
-from dotclient import __version__
-from dotclient.config import DEFAULTS
-from dotclient.const import config_env_var, config_file_name, log_levels
+from dota2cl import __version__
+from dota2cl.config import DEFAULTS
+from dota2cl.const import config_env_var, config_file_name, log_levels
 
 
 def positive_int(value: str) -> int:
@@ -43,8 +43,8 @@ def parse_args(settings: dict | None = None,
     """
     settings = settings or DEFAULTS
     parser = ArgumentParser(
-        # Fixed name, as 'python -m dotclient' would show '__main__.py'
-        prog="dotclient",
+        # Fixed name, as 'python -m dota2cl' would show '__main__.py'
+        prog="dota2cl",
         description="Find the DOTA 2 teams with the most combined player *experience",  # noqa: E501
         epilog="*Experience is defined as the length of a player's recorded history.",  # noqa: E501
     )

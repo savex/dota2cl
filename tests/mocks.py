@@ -7,7 +7,7 @@ import urllib.parse as urlparse
 
 from requests.exceptions import HTTPError
 
-from dotclient.const import opendota_api_base_url
+from dota2cl.const import opendota_api_base_url
 
 from tests.test_base import tests_dir
 

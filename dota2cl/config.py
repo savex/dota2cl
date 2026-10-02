@@ -10,14 +10,14 @@ import shutil
 
 from copy import deepcopy
 
-from dotclient.const import api_client_max_retries, \
+from dota2cl.const import api_client_max_retries, \
     api_client_retry_backoff_sec, api_client_throttle_timeout_sec, \
     config_env_var, config_file_name, default_log_level, \
     default_num_teams, env_var_prefix, log_levels, \
     opendota_api_base_url, opendota_api_key_env_var, \
     requests_timeout_sec, resource_cache_timeout_sec
-from dotclient.exceptions import ConfigError
-from dotclient.log import logger_cli
+from dota2cl.exceptions import ConfigError
+from dota2cl.log import logger_cli
 
 # Default config bundled with the package
 package_config_path = os.path.join(os.path.dirname(__file__),
